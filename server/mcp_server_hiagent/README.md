@@ -1,6 +1,6 @@
 # HiAgent MCP Server
 
-This MCP server provides tools to interact with the HiAgent Platform OpenAPI, allowing you to list knowledge bases (datasets) in a workspace, inspect a dataset, and call the HiAgent knowledge engine to retrieve knowledge chunks from your datasets.
+This MCP server wraps HiAgent Platform OpenAPI capabilities as MCP tools. It currently provides knowledge-engine tools — listing knowledge bases (datasets) in a workspace, inspecting a dataset, and calling the HiAgent knowledge engine to retrieve knowledge chunks — and will keep adding more HiAgent OpenAPI capabilities over time.
 
 ## Features
 

@@ -2,7 +2,7 @@
 
 ## 产品描述
 
-HiAgent MCP Server 是一个模型上下文协议（Model Context Protocol）服务器，为 MCP 客户端（如 Claude Desktop、Cursor，以及 HiAgent 平台的 MCP 插件）提供与 HiAgent 平台 OpenAPI 交互的能力。本 Server 聚焦知识引擎检索能力：支持列出指定 workspace 下的知识库、查看知识库详情，并调用知识引擎在指定知识库中检索知识片段。
+HiAgent MCP Server 是一个模型上下文协议（Model Context Protocol）服务器，将 HiAgent 平台 OpenAPI 的能力封装为标准 MCP 工具，供 MCP 客户端（如 Claude Desktop、Cursor，以及 HiAgent 平台的 MCP 插件）使用。本 Server 持续接入 HiAgent 平台的各类 OpenAPI 能力，当前已提供知识引擎相关工具：列出指定 workspace 下的知识库、查看知识库详情，并调用知识引擎在指定知识库中检索知识片段；后续将陆续扩展更多能力。
 
 ## 分类
 

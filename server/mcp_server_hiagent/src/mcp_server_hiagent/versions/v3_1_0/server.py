@@ -27,10 +27,12 @@ def create_mcp_server(client: OpenAPIClient | None = None) -> FastMCP:
     mcp = FastMCP(
         name="hiagent-mcp-server",
         instructions=(
-            "HiAgent MCP Server exposes selected HiAgent OpenAPI capabilities. "
-            "It supports stdio and streamable-http transports and AK/SK "
-            "authentication only. Credentials are provided via environment "
-            "variables (HIAGENT_TOP_HOST, HIAGENT_ACCESS_KEY_ID, "
+            "HiAgent MCP Server wraps HiAgent Platform OpenAPI capabilities as "
+            "MCP tools. It currently provides knowledge-engine tools (dataset "
+            "listing and knowledge search) and will keep adding more HiAgent "
+            "OpenAPI capabilities. It supports stdio and streamable-http "
+            "transports and AK/SK authentication only. Credentials are provided "
+            "via environment variables (HIAGENT_TOP_HOST, HIAGENT_ACCESS_KEY_ID, "
             "HIAGENT_SECRET_ACCESS_KEY)."
         ),
     )
