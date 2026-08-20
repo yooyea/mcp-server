@@ -140,6 +140,36 @@ Parameters:
 - `rerank_id` (optional): rerank model id.
 - `knowledge_run_mode` (optional): run mode, one of `quick` / `smart_search` / `wiki_search`.
 
+## Best Practices & Test Prompts
+
+Recommended usage pattern and, for each exposed tool, a natural-language prompt you can give an MCP-enabled agent to exercise it plus the expected result. These prompts double as a manual smoke test after wiring the server into a client.
+
+**Recommended flow:** `health_check` (confirm config) → `list_datasets` (discover `DatasetIDs`) → optionally `get_dataset` (read default retrieval params) → `call_knowledge_engine_tool` (retrieve). `WorkspaceID` is not discoverable via this server — take it from the HiAgent console URL (`.../workspace/<id>/...`).
+
+#### health_check
+
+- **Best practice:** call it first, before any credentialed tool, to confirm the server sees your AK/SK and top host. It never calls the OpenAPI and never echoes secrets — only booleans.
+- **Test prompt:** "Check whether the HiAgent MCP server is healthy and properly configured."
+- **Expected result:** `status="ok"`, `auth="aksk"`, and `configured=true` with each `*_configured` flag true when env vars are set; no credential values are returned.
+
+#### list_datasets
+
+- **Best practice:** use it to discover the `DatasetIDs` required by `call_knowledge_engine_tool`; page with `page_number`/`page_size` (1–100) instead of requesting everything at once. `dataset` == knowledge base.
+- **Test prompt:** "List the knowledge bases in workspace `<workspace_id>`."
+- **Expected result:** a paged list of datasets, each with its id and name, that you can feed into the knowledge engine.
+
+#### get_dataset
+
+- **Best practice:** call it when you want a dataset's default retrieval parameters (e.g. `RetrievalTopK`, `RetrievalScoreThreshold`) so your `call_knowledge_engine_tool` arguments match how the base was configured.
+- **Test prompt:** "Show the details and default retrieval settings of dataset `<dataset_id>` in workspace `<workspace_id>`."
+- **Expected result:** the dataset's metadata including its default retrieval parameters.
+
+#### call_knowledge_engine_tool
+
+- **Best practice:** pass 1–5 short, self-contained `queries` (not a whole conversation); start with a small `top_k` (e.g. 3) and a modest `score_threshold` (e.g. 0.2), then tune. Only `tool_name="knowledge_search"` is supported in this version.
+- **Test prompt:** "Search datasets `[<dataset_id>]` in workspace `<workspace_id>` for \"How do I reset my password?\" and return the top 3 chunks."
+- **Expected result:** a `Result.KnowledgeSearch.Hits[]` payload where each hit carries `DatasetID` / `DocumentID` / `SegmentID` / `Content`; an unsupported `tool_name` is rejected with a clear error, and invalid arguments (empty `queries`, `score_threshold` outside 0–1) raise a validation error.
+
 ## MCP Integration
 
 To add this server to your MCP configuration, add the following to your MCP settings file:

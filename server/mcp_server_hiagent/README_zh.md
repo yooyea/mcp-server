@@ -138,6 +138,36 @@ Parameters:
 - `rerank_id` (可选): 重排模型 ID
 - `knowledge_run_mode` (可选): 运行模式，枚举 `quick` / `smart_search` / `wiki_search`
 
+## 最佳实践与测试 Prompt
+
+推荐的使用顺序，以及每个透出方法的自然语言测试 Prompt 与期望结果——这些 Prompt 也可作为接入 MCP 客户端后的手工冒烟测试。
+
+**推荐流程：** `health_check`（确认配置）→ `list_datasets`（获取 `DatasetIDs`）→ 可选 `get_dataset`（读默认检索参数）→ `call_knowledge_engine_tool`（检索）。`WorkspaceID` 无法通过本 Server 列举，需从 HiAgent 控制台网页 URL（`.../workspace/<id>/...`）获取。
+
+#### health_check
+
+- **最佳实践：** 在任何需要凭证的工具之前先调用它，确认 Server 已读到 AK/SK 与 top host。它不调用 OpenAPI、不回显任何凭证，只返回布尔值。
+- **测试 Prompt：** “检查 HiAgent MCP Server 是否健康、配置是否齐备。”
+- **期望结果：** `status="ok"`、`auth="aksk"`，环境变量齐备时 `configured=true` 且各 `*_configured` 为 true；不返回任何凭证明文。
+
+#### list_datasets
+
+- **最佳实践：** 用它获取 `call_knowledge_engine_tool` 所需的 `DatasetIDs`；用 `page_number`/`page_size`（1~100）分页，不要一次性全量拉取。dataset 即知识库。
+- **测试 Prompt：** “列出 workspace `<workspace_id>` 下的知识库。”
+- **期望结果：** 分页的知识库列表，每项含 id 与名称，可用于后续知识引擎调用。
+
+#### get_dataset
+
+- **最佳实践：** 当需要某知识库的默认检索参数（如 `RetrievalTopK`、`RetrievalScoreThreshold`）时调用，使 `call_knowledge_engine_tool` 的入参与该库配置保持一致。
+- **测试 Prompt：** “展示 workspace `<workspace_id>` 下知识库 `<dataset_id>` 的详情与默认检索设置。”
+- **期望结果：** 该知识库的元数据，含默认检索参数。
+
+#### call_knowledge_engine_tool
+
+- **最佳实践：** 传入 1~5 条简短、可独立理解的 `queries`（不要传整段对话）；`top_k` 从较小值（如 3）起步、`score_threshold` 取适中值（如 0.2）再调优。本版本仅支持 `tool_name="knowledge_search"`。
+- **测试 Prompt：** “在 workspace `<workspace_id>` 的知识库 `[<dataset_id>]` 中检索「如何重置密码？」，返回相关度最高的 3 个切片。”
+- **期望结果：** `Result.KnowledgeSearch.Hits[]`，每个 hit 含 `DatasetID` / `DocumentID` / `SegmentID` / `Content`；不支持的 `tool_name` 返回明确错误，非法入参（`queries` 为空、`score_threshold` 越界）触发校验错误。
+
 ### uvx 启动
 
 ```json
