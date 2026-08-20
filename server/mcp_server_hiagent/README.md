@@ -284,6 +284,78 @@ Parameters:
 - `limit` (optional): maximum number of source chunks per page.
 - `cursor_segment_id` (optional): segment id to continue paging from.
 
+## Best Practices & Test Prompts
+
+Recommended usage pattern and, for every exposed tool, a natural-language prompt you can give an MCP-enabled agent to exercise it plus the expected result. These prompts double as a manual smoke test after wiring the server into a client.
+
+**Recommended flow:** `health_check` (confirm config) → `list_datasets` / `list_knowledge_bases` (discover `DatasetIDs` and each base's `AvailableTools`) → retrieve with `search_knowledge` / `grep_knowledge_chunks`, or navigate with `search_wiki` → `read_wiki_page` → `read_wiki_source`; use `list_document_infos` / `list_document_chunks` to inspect or read a specific document. `WorkspaceID` is not discoverable via this server — take it from the HiAgent console URL (`.../workspace/<id>/...`).
+
+#### health_check
+
+- **Best practice:** call it first, before any credentialed tool, to confirm the server sees your AK/SK and top host. It never calls the OpenAPI and never echoes secrets — only booleans.
+- **Test prompt:** "Check whether the HiAgent MCP server is healthy and properly configured."
+- **Expected result:** `status="ok"`, `auth="aksk"`, and `configured=true` with each `*_configured` flag true when env vars are set; no credential values returned.
+
+#### list_datasets
+
+- **Best practice:** use it to discover the `DatasetIDs` the knowledge-engine tools need; page with `page_number`/`page_size` (1–100). `dataset` == knowledge base.
+- **Test prompt:** "List the knowledge bases in workspace `<workspace_id>`."
+- **Expected result:** a paged list of datasets, each with id and name.
+
+#### get_dataset
+
+- **Best practice:** call it for a dataset's default retrieval parameters (e.g. `RetrievalTopK`, `RetrievalScoreThreshold`) so your `search_knowledge` arguments match how the base is configured.
+- **Test prompt:** "Show the details and default retrieval settings of dataset `<dataset_id>` in workspace `<workspace_id>`."
+- **Expected result:** the dataset's metadata including its default retrieval parameters.
+
+#### list_knowledge_bases
+
+- **Best practice:** call it to check which sub-tools a base supports (`AvailableTools`) and its `IndexTypes` before choosing a retrieval tool — e.g. only use Wiki tools on a base whose index types include `wiki`.
+- **Test prompt:** "Which knowledge-engine tools does dataset `<dataset_id>` support in workspace `<workspace_id>`?"
+- **Expected result:** a `KnowledgeBases[]` list where each item carries `DatasetID`, `IndexTypes` and `AvailableTools`.
+
+#### search_knowledge
+
+- **Best practice:** pass 1–5 short, self-contained `queries` (not a whole conversation); start with a small `top_k` (e.g. 3) and a modest `score_threshold` (e.g. 0.2), then tune. This is the primary tool for concept/overview questions.
+- **Test prompt:** "Search datasets `[<dataset_id>]` in workspace `<workspace_id>` for \"How do I reset my password?\" and return the top 3 chunks."
+- **Expected result:** `KnowledgeSearch.Hits[]`, each hit with `DatasetID` / `DocumentID` / `ResourceID` / `SegmentID` / `Content` / `Score`; empty `queries` or a `score_threshold` outside 0–1 raises a validation error.
+
+#### grep_knowledge_chunks
+
+- **Best practice:** use it only for exact tokens (error codes, identifiers, fixed phrases) that semantic search misses; combine alternatives in one RE2 `pattern` with `|`, optionally narrow with `queries`. It matches within retrieved candidates, so don't present it as an exhaustive full-dataset scan.
+- **Test prompt:** "In datasets `[<dataset_id>]` of workspace `<workspace_id>`, find chunks matching the regex `ERR\\d{3}`."
+- **Expected result:** `GrepChunks.Hits[]` with matching chunks (resource/segment/content); a missing `pattern` raises a validation error.
+
+#### list_document_infos
+
+- **Best practice:** use it to fetch metadata for several documents at once, grouped by dataset; keys of `resource_ids` must be within `dataset_ids`. Metadata only — not a substitute for reading content.
+- **Test prompt:** "Show the title, type, size and status of documents `<res_1>`, `<res_2>` in dataset `<dataset_id>` (workspace `<workspace_id>`)."
+- **Expected result:** `ListDocInfos.Documents[]`, each with `DatasetID` / `ResourceID` / `Title` / `Size` / `Type` / `Status` / `SegmentCount` / timestamps.
+
+#### list_document_chunks
+
+- **Best practice:** use it after another tool gives you a `resource_id`, when you need surrounding context or sequential reading rather than relevance ranking; page forward with the returned `cursor_segment_id`.
+- **Test prompt:** "Read the first 20 chunks of document `<resource_id>` in dataset `<dataset_id>` (workspace `<workspace_id>`) in order."
+- **Expected result:** `ListKnowledgeChunks.Chunks[]` in order (with `Position` / `DocumentName`) plus a `NextCursorSegmentID` when more remain.
+
+#### search_wiki
+
+- **Best practice:** use short natural-language `queries` to locate Wiki pages for conceptual navigation; results are page candidates (with `Slug`), not final evidence — read the page next.
+- **Test prompt:** "Search the Wiki of dataset `<dataset_id>` (workspace `<workspace_id>`) for \"reverse acquisition\"."
+- **Expected result:** `WikiSearch.Pages[]`, each with `Slug` / `Title` / `PageType` / `Summary` / `Score`.
+
+#### read_wiki_page
+
+- **Best practice:** call it with a `Slug` from `search_wiki` to understand a page's structure, summary and links; treat the content as generated navigation, not final factual evidence.
+- **Test prompt:** "Open the Wiki page `concept/reverse-acquisition` in dataset `<dataset_id>` (workspace `<workspace_id>`)."
+- **Expected result:** `WikiReadPage.Page` with `Content`, `Aliases`, `InLinks`/`OutLinks`, `SourceRefs`.
+
+#### read_wiki_source
+
+- **Best practice:** after identifying a relevant Wiki page, use its `Slug` to read the original source chunks — these are the final evidence for facts, numbers, quotations and code. Page forward with `cursor_segment_id`.
+- **Test prompt:** "Read the original source chunks behind Wiki page `concept/reverse-acquisition` in dataset `<dataset_id>` (workspace `<workspace_id>`)."
+- **Expected result:** `WikiReadSourceDoc.Hits[]` (original chunks) plus a `NextCursorSegmentID` when more remain.
+
 ## MCP Integration
 
 To add this server to your MCP configuration, add the following to your MCP settings file:

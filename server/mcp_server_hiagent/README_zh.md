@@ -287,6 +287,78 @@ Parameters:
 - `limit` (可选): 每页返回的最大源切片数
 - `cursor_segment_id` (可选): 续页游标
 
+## 最佳实践与测试 Prompt
+
+推荐的使用顺序，以及每个透出方法的自然语言测试 Prompt 与期望结果——这些 Prompt 也可作为接入 MCP 客户端后的手工冒烟测试。
+
+**推荐流程：** `health_check`（确认配置）→ `list_datasets` / `list_knowledge_bases`（获取 `DatasetIDs` 及各库 `AvailableTools`）→ 用 `search_knowledge` / `grep_knowledge_chunks` 检索，或用 `search_wiki` → `read_wiki_page` → `read_wiki_source` 导航溯源；用 `list_document_infos` / `list_document_chunks` 查看或阅读指定文档。`WorkspaceID` 无法通过本 Server 列举，需从 HiAgent 控制台网页 URL（`.../workspace/<id>/...`）获取。
+
+#### health_check
+
+- **最佳实践：** 在任何需要凭证的工具之前先调用，确认 Server 已读到 AK/SK 与 top host。不调用 OpenAPI、不回显凭证，只返回布尔值。
+- **测试 Prompt：** “检查 HiAgent MCP Server 是否健康、配置是否齐备。”
+- **期望结果：** `status="ok"`、`auth="aksk"`，环境变量齐备时 `configured=true` 且各 `*_configured` 为 true；不返回任何凭证明文。
+
+#### list_datasets
+
+- **最佳实践：** 用它获取知识引擎工具所需的 `DatasetIDs`；用 `page_number`/`page_size`（1~100）分页。dataset 即知识库。
+- **测试 Prompt：** “列出 workspace `<workspace_id>` 下的知识库。”
+- **期望结果：** 分页的知识库列表，每项含 id 与名称。
+
+#### get_dataset
+
+- **最佳实践：** 需要某库默认检索参数（如 `RetrievalTopK`、`RetrievalScoreThreshold`）时调用，使 `search_knowledge` 入参与该库配置一致。
+- **测试 Prompt：** “展示 workspace `<workspace_id>` 下知识库 `<dataset_id>` 的详情与默认检索设置。”
+- **期望结果：** 该知识库的元数据，含默认检索参数。
+
+#### list_knowledge_bases
+
+- **最佳实践：** 选检索工具前先看某库支持哪些子工具（`AvailableTools`）与 `IndexTypes`——例如只在 `IndexTypes` 含 `wiki` 的库上用 Wiki 类工具。
+- **测试 Prompt：** “workspace `<workspace_id>` 下知识库 `<dataset_id>` 支持哪些知识引擎工具？”
+- **期望结果：** `KnowledgeBases[]`，每项含 `DatasetID`、`IndexTypes`、`AvailableTools`。
+
+#### search_knowledge
+
+- **最佳实践：** 传 1~5 条简短、可独立理解的 `queries`（不要传整段对话）；`top_k` 从小值（如 3）起步、`score_threshold` 取适中值（如 0.2）再调优。概念/概览类问题优先用它。
+- **测试 Prompt：** “在 workspace `<workspace_id>` 的知识库 `[<dataset_id>]` 中检索「如何重置密码？」，返回前 3 个切片。”
+- **期望结果：** `KnowledgeSearch.Hits[]`，每个 hit 含 `DatasetID` / `DocumentID` / `ResourceID` / `SegmentID` / `Content` / `Score`；`queries` 为空或 `score_threshold` 越界触发校验错误。
+
+#### grep_knowledge_chunks
+
+- **最佳实践：** 仅用于语义检索找不到的精确 token（错误码、标识符、固定短语）；多候选用 `|` 合并进一条 RE2 `pattern`，可用 `queries` 缩小候选。它在召回候选内匹配，不保证全库查全。
+- **测试 Prompt：** “在 workspace `<workspace_id>` 的知识库 `[<dataset_id>]` 中，匹配正则 `ERR\\d{3}` 的切片。”
+- **期望结果：** `GrepChunks.Hits[]`（含 resource/segment/content）；缺 `pattern` 触发校验错误。
+
+#### list_document_infos
+
+- **最佳实践：** 一次性按知识库批量取多个文档的元数据；`resource_ids` 的 key 必须在 `dataset_ids` 内。仅元数据，不替代读正文。
+- **测试 Prompt：** “展示 workspace `<workspace_id>` 知识库 `<dataset_id>` 下文档 `<res_1>`、`<res_2>` 的标题、类型、大小与状态。”
+- **期望结果：** `ListDocInfos.Documents[]`，每项含 `DatasetID` / `ResourceID` / `Title` / `Size` / `Type` / `Status` / `SegmentCount` / 时间戳。
+
+#### list_document_chunks
+
+- **最佳实践：** 在别的工具给出 `resource_id` 后，当你需要上下文或顺序阅读（而非相关性排序）时使用；用返回的 `cursor_segment_id` 续页。
+- **测试 Prompt：** “按顺序读取 workspace `<workspace_id>` 知识库 `<dataset_id>` 下文档 `<resource_id>` 的前 20 个切片。”
+- **期望结果：** 有序的 `ListKnowledgeChunks.Chunks[]`（含 `Position` / `DocumentName`），未读完时带 `NextCursorSegmentID`。
+
+#### search_wiki
+
+- **最佳实践：** 用简短自然语言 `queries` 定位 Wiki 页面做概念导航；结果是页面候选（含 `Slug`），非最终证据，需再读页面。
+- **测试 Prompt：** “在 workspace `<workspace_id>` 知识库 `<dataset_id>` 的 Wiki 中搜索「反向购买」。”
+- **期望结果：** `WikiSearch.Pages[]`，每项含 `Slug` / `Title` / `PageType` / `Summary` / `Score`。
+
+#### read_wiki_page
+
+- **最佳实践：** 用 `search_wiki` 返回的 `Slug` 读取页面结构、摘要与关联；页面内容属生成的导航材料，非最终事实证据。
+- **测试 Prompt：** “打开 workspace `<workspace_id>` 知识库 `<dataset_id>` 的 Wiki 页面 `concept/reverse-acquisition`。”
+- **期望结果：** `WikiReadPage.Page`，含 `Content`、`Aliases`、`InLinks`/`OutLinks`、`SourceRefs`。
+
+#### read_wiki_source
+
+- **最佳实践：** 确定相关 Wiki 页面后，用其 `Slug` 读取原始文档切片——事实、数字、引文、代码的最终证据来源；用 `cursor_segment_id` 续页。
+- **测试 Prompt：** “读取 workspace `<workspace_id>` 知识库 `<dataset_id>` 中 Wiki 页面 `concept/reverse-acquisition` 背后的原始文档切片。”
+- **期望结果：** `WikiReadSourceDoc.Hits[]`（原始切片），未读完时带 `NextCursorSegmentID`。
+
 ### uvx 启动
 
 ```json
