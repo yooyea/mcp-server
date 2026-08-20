@@ -1,8 +1,8 @@
 """HiAgent Dataset (knowledge base) OpenAPI tools.
 
 These are dependency tools for the knowledge engine: they let callers discover
-the ``DatasetIDs`` (and default retrieval parameters) required by
-``call_knowledge_engine_tool``.
+the ``DatasetIDs`` (and default retrieval parameters) required by the
+knowledge-engine capability tools (``search_knowledge`` / ``list_document_chunks``).
 """
 
 from __future__ import annotations

@@ -22,9 +22,16 @@ def test_server_registers_knowledge_engine_tools() -> None:
 
     assert names == {
         "health_check",
-        "call_knowledge_engine_tool",
         "list_datasets",
         "get_dataset",
+        "list_knowledge_bases",
+        "search_knowledge",
+        "grep_knowledge_chunks",
+        "get_document_info",
+        "list_document_chunks",
+        "search_wiki",
+        "read_wiki_page",
+        "read_wiki_source",
     }
 
 

@@ -2,7 +2,7 @@
 
 ## 产品描述
 
-HiAgent MCP Server 是一个模型上下文协议（Model Context Protocol）服务器，将 HiAgent 平台 OpenAPI 的能力封装为标准 MCP 工具，供 MCP 客户端（如 Claude Desktop、Cursor，以及 HiAgent 平台的 MCP 插件）使用。本 Server 持续接入 HiAgent 平台的各类 OpenAPI 能力，当前已提供知识引擎相关工具：列出指定 workspace 下的知识库、查看知识库详情，并调用知识引擎在指定知识库中检索知识片段；后续将陆续扩展更多能力。
+HiAgent MCP Server 是一个模型上下文协议（Model Context Protocol）服务器，将 HiAgent 平台 OpenAPI 的能力封装为标准 MCP 工具，供 MCP 客户端（如 Claude Desktop、Cursor，以及 HiAgent 平台的 MCP 插件）使用。每个工具都按其对用户暴露的**能力**命名，而非直接照搬 OpenAPI 的 action 名，因此同一个 OpenAPI action 可以按不同参数组合暴露为多个能力工具。本 Server 持续接入 HiAgent 平台的各类 OpenAPI 能力，当前已提供知识引擎相关工具：列出指定 workspace 下的知识库、查看知识库详情、按相关性检索知识片段，以及按顺序列出某个文档的知识分片；后续将陆续扩展更多能力。
 
 ## 分类
 
@@ -10,10 +10,30 @@ HiAgent MCP Server 是一个模型上下文协议（Model Context Protocol）服
 
 ## 功能
 
-- 列出指定 workspace 下的知识库列表
-- 查看单个知识库的详细信息（含默认检索参数）
-- 调用知识引擎在指定知识库中检索知识片段（`knowledge_search`）
+- 列出指定 workspace 下的知识库列表，并查看单个知识库详情
+- 查看某知识库支持的子工具（`list_knowledge_bases`，返回 `AvailableTools`）
+- 在一个或多个知识库中按相关性检索知识片段（`search_knowledge`）
+- 按 RE2 正则匹配切片（`grep_knowledge_chunks`）
+- 读取文档元数据（`get_document_info`）与按顺序读取文档切片（`list_document_chunks`）
+- 搜索生成的 Wiki 页面（`search_wiki`）、读取 Wiki 页面（`read_wiki_page`）、溯源 Wiki 引用的原始文档切片（`read_wiki_source`）
 - 查看 MCP Server 与 OpenAPI 的配置状态
+
+### 面向能力的工具命名
+
+HiAgent OpenAPI 通过单个 `CallKnowledgeEngineTool` action 以「分发器」形态暴露知识引擎：`ToolName` 字段选择子工具，请求体携带同名 PascalCase 参数对象。本 Server 不直接暴露这种分发器形态，而是把每个 `(ToolName, 参数对象)` 组合映射为一个面向能力命名、参数扁平的独立 MCP 工具（8 个子工具均已在真实 top 服务实测，2026-08-20）：
+
+| MCP 工具 | OpenAPI action | `ToolName` | 参数对象 | 能力 |
+|---|---|---|---|---|
+| `list_knowledge_bases` | `CallKnowledgeEngineTool` | `list_knowledge_bases` | — | 列知识库及其 `AvailableTools` |
+| `search_knowledge` | `CallKnowledgeEngineTool` | `knowledge_search` | `KnowledgeSearch` | 跨知识库按相关性检索 |
+| `grep_knowledge_chunks` | `CallKnowledgeEngineTool` | `grep_chunks` | `GrepChunks` | 候选切片内 RE2 正则匹配 |
+| `get_document_info` | `CallKnowledgeEngineTool` | `get_doc_info` | `GetDocInfo` | 单文档元数据 |
+| `list_document_chunks` | `CallKnowledgeEngineTool` | `list_knowledge_chunks` | `ListKnowledgeChunks` | 顺序读取单个文档的分片 |
+| `search_wiki` | `CallKnowledgeEngineTool` | `wiki_search` | `WikiSearch` | 搜索生成的 Wiki 页面 |
+| `read_wiki_page` | `CallKnowledgeEngineTool` | `wiki_read_page` | `WikiReadPage` | 按 slug 读取 Wiki 页面 |
+| `read_wiki_source` | `CallKnowledgeEngineTool` | `wiki_read_source_doc` | `WikiReadSourceDoc` | 读取 Wiki 页引用的原始切片 |
+
+> 说明：HiAgent 中 dataset 即知识库，故 `list_datasets` / `get_dataset` 是「列/查知识库」能力（`list_knowledge_bases` 额外返回各库的 `AvailableTools`）。
 
 ## 使用指南
 
@@ -79,7 +99,14 @@ HiAgent MCP Server 提供以下功能：
 - `health_check`: 返回 MCP server 与 OpenAPI 的配置状态
 - `list_datasets`: 列出指定 workspace 下的知识库列表
 - `get_dataset`: 获取单个知识库的详细信息
-- `call_knowledge_engine_tool`: 调用知识引擎在指定知识库中检索
+- `list_knowledge_bases`: 列出知识库及其支持的子工具（`AvailableTools`）
+- `search_knowledge`: 在一个或多个知识库中按相关性检索知识片段
+- `grep_knowledge_chunks`: 按 RE2 正则匹配知识切片
+- `get_document_info`: 获取单个文档的元数据
+- `list_document_chunks`: 按顺序列出单个文档/资源的知识分片
+- `search_wiki`: 搜索生成的 Wiki 页面
+- `read_wiki_page`: 按 slug 读取 Wiki 页面
+- `read_wiki_source`: 读取 Wiki 页引用的原始文档切片
 
 #### health_check
 
@@ -115,13 +142,22 @@ Parameters:
 - `workspace_id` (必须): 知识库所属的 workspace ID
 - `dataset_id` (必须): 要获取信息的知识库 ID
 
-#### call_knowledge_engine_tool
+#### list_knowledge_bases
 
 ```python
-call_knowledge_engine_tool(
+list_knowledge_bases(workspace_id="workspace_id", dataset_ids=["dataset_id"])
+```
+
+Parameters:
+- `workspace_id` (必须): 知识库所属的 workspace ID
+- `dataset_ids` (必须): 要描述的知识库 ID 列表，至少 1 个
+
+#### search_knowledge
+
+```python
+search_knowledge(
     workspace_id="workspace_id",
     dataset_ids=["dataset_id"],
-    tool_name="knowledge_search",
     queries=["如何重置密码？"],
     top_k=3,
     score_threshold=0.2,
@@ -131,42 +167,125 @@ call_knowledge_engine_tool(
 Parameters:
 - `workspace_id` (必须): 知识库所属的 workspace ID
 - `dataset_ids` (必须): 要检索的知识库 ID 列表，至少 1 个
-- `tool_name` (可选): 子工具名称，默认 `knowledge_search`；当前仅支持 `knowledge_search`
-- `queries` (可选): 检索查询词列表（`knowledge_search` 必填）
+- `queries` (必须): 检索查询词列表，至少 1 个
 - `top_k` (可选): 返回的最大结果数
-- `score_threshold` (可选): 相关性分数阈值（0~1）
+- `score_threshold` (可选): 保留结果的最小相关性分数（0~1）
 - `rerank_id` (可选): 重排模型 ID
 - `knowledge_run_mode` (可选): 运行模式，枚举 `quick` / `smart_search` / `wiki_search`
 
-## 最佳实践与测试 Prompt
+#### grep_knowledge_chunks
 
-推荐的使用顺序，以及每个透出方法的自然语言测试 Prompt 与期望结果——这些 Prompt 也可作为接入 MCP 客户端后的手工冒烟测试。
+按一条 RE2 正则匹配知识切片；用于错误码、标识符、固定短语等精确定位。先召回候选再匹配，不是全库扫描。
 
-**推荐流程：** `health_check`（确认配置）→ `list_datasets`（获取 `DatasetIDs`）→ 可选 `get_dataset`（读默认检索参数）→ `call_knowledge_engine_tool`（检索）。`WorkspaceID` 无法通过本 Server 列举，需从 HiAgent 控制台网页 URL（`.../workspace/<id>/...`）获取。
+```python
+grep_knowledge_chunks(
+    workspace_id="workspace_id",
+    dataset_ids=["dataset_id"],
+    pattern="ERR\\d+",
+    queries=["错误码"],
+    limit=10,
+)
+```
 
-#### health_check
+Parameters:
+- `workspace_id` (必须): 知识库所属的 workspace ID
+- `dataset_ids` (必须): 要检索的知识库 ID 列表，至少 1 个
+- `pattern` (必须): 一条 RE2 正则（不支持反向引用/前后瞻）
+- `queries` (可选): 用于缩小候选集的查询词
+- `limit` (可选): 命中上限
 
-- **最佳实践：** 在任何需要凭证的工具之前先调用它，确认 Server 已读到 AK/SK 与 top host。它不调用 OpenAPI、不回显任何凭证，只返回布尔值。
-- **测试 Prompt：** “检查 HiAgent MCP Server 是否健康、配置是否齐备。”
-- **期望结果：** `status="ok"`、`auth="aksk"`，环境变量齐备时 `configured=true` 且各 `*_configured` 为 true；不返回任何凭证明文。
+#### get_document_info
 
-#### list_datasets
+获取单个文档的元数据（标题、类型、大小、状态、分段数、时间戳）。仅元数据，非文档内容。
 
-- **最佳实践：** 用它获取 `call_knowledge_engine_tool` 所需的 `DatasetIDs`；用 `page_number`/`page_size`（1~100）分页，不要一次性全量拉取。dataset 即知识库。
-- **测试 Prompt：** “列出 workspace `<workspace_id>` 下的知识库。”
-- **期望结果：** 分页的知识库列表，每项含 id 与名称，可用于后续知识引擎调用。
+```python
+get_document_info(
+    workspace_id="workspace_id",
+    dataset_ids=["dataset_id"],
+    resource_id="resource_id",
+)
+```
 
-#### get_dataset
+Parameters:
+- `workspace_id` (必须): 知识库所属的 workspace ID
+- `dataset_ids` (必须): 文档所属的知识库 ID 列表，至少 1 个
+- `resource_id` (必须): 文档/资源 ID（来自前序工具结果）
 
-- **最佳实践：** 当需要某知识库的默认检索参数（如 `RetrievalTopK`、`RetrievalScoreThreshold`）时调用，使 `call_knowledge_engine_tool` 的入参与该库配置保持一致。
-- **测试 Prompt：** “展示 workspace `<workspace_id>` 下知识库 `<dataset_id>` 的详情与默认检索设置。”
-- **期望结果：** 该知识库的元数据，含默认检索参数。
+#### list_document_chunks
 
-#### call_knowledge_engine_tool
+按阅读顺序列出单个文档/资源的知识分片；与 `search_knowledge`（按查询相关性排序）不同，本工具顺序遍历一个资源，适合浏览文档全文。
 
-- **最佳实践：** 传入 1~5 条简短、可独立理解的 `queries`（不要传整段对话）；`top_k` 从较小值（如 3）起步、`score_threshold` 取适中值（如 0.2）再调优。本版本仅支持 `tool_name="knowledge_search"`。
-- **测试 Prompt：** “在 workspace `<workspace_id>` 的知识库 `[<dataset_id>]` 中检索「如何重置密码？」，返回相关度最高的 3 个切片。”
-- **期望结果：** `Result.KnowledgeSearch.Hits[]`，每个 hit 含 `DatasetID` / `DocumentID` / `SegmentID` / `Content`；不支持的 `tool_name` 返回明确错误，非法入参（`queries` 为空、`score_threshold` 越界）触发校验错误。
+```python
+list_document_chunks(
+    workspace_id="workspace_id",
+    dataset_ids=["dataset_id"],
+    resource_id="resource_id",
+    limit=50,
+)
+```
+
+Parameters:
+- `workspace_id` (必须): 知识库所属的 workspace ID
+- `dataset_ids` (必须): 资源所属的知识库 ID 列表，至少 1 个
+- `resource_id` (必须): 要列出分片的文档/资源 ID
+- `limit` (可选): 每页返回的最大分片数
+- `cursor_segment_id` (可选): 续页游标，传入上一页返回的最后一个 segment ID
+
+#### search_wiki
+
+搜索生成的 Wiki 页面，返回页面候选（含 `Slug`）用于导航，不作为最终证据。
+
+```python
+search_wiki(
+    workspace_id="workspace_id",
+    dataset_ids=["dataset_id"],
+    queries=["反向购买"],
+    limit=5,
+)
+```
+
+Parameters:
+- `workspace_id` (必须): 知识库所属的 workspace ID
+- `dataset_ids` (必须): 要检索的知识库 ID 列表，至少 1 个
+- `queries` (必须): 检索查询词列表，至少 1 个
+- `limit` (可选): 返回页面上限
+
+#### read_wiki_page
+
+按 slug 读取单个 Wiki 页面（结构、摘要、内容）。Wiki 页面是生成的导航材料，非最终证据。
+
+```python
+read_wiki_page(
+    workspace_id="workspace_id",
+    dataset_ids=["dataset_id"],
+    slug="concept/reverse-acquisition",
+)
+```
+
+Parameters:
+- `workspace_id` (必须): 知识库所属的 workspace ID
+- `dataset_ids` (必须): 页面所属的知识库 ID 列表，至少 1 个
+- `slug` (必须): Wiki 页面 slug（来自 `search_wiki`）
+
+#### read_wiki_source
+
+读取 Wiki 页引用的原始文档切片——事实、数字、引文、代码的最终证据来源。
+
+```python
+read_wiki_source(
+    workspace_id="workspace_id",
+    dataset_ids=["dataset_id"],
+    slug="concept/reverse-acquisition",
+    limit=5,
+)
+```
+
+Parameters:
+- `workspace_id` (必须): 知识库所属的 workspace ID
+- `dataset_ids` (必须): 页面所属的知识库 ID 列表，至少 1 个
+- `slug` (必须): 要读取来源的 Wiki 页面 slug
+- `limit` (可选): 每页返回的最大源切片数
+- `cursor_segment_id` (可选): 续页游标
 
 ### uvx 启动
 

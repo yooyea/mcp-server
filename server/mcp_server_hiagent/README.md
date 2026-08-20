@@ -1,13 +1,33 @@
 # HiAgent MCP Server
 
-This MCP server wraps HiAgent Platform OpenAPI capabilities as MCP tools. It currently provides knowledge-engine tools — listing knowledge bases (datasets) in a workspace, inspecting a dataset, and calling the HiAgent knowledge engine to retrieve knowledge chunks — and will keep adding more HiAgent OpenAPI capabilities over time.
+This MCP server wraps HiAgent Platform OpenAPI capabilities as MCP tools. Each tool is named after the user-facing **capability** it provides rather than the raw OpenAPI action, so the same OpenAPI action can surface as several distinct capability tools. It provides dataset discovery and the full HiAgent knowledge-engine tool set (semantic search, regex grep, document metadata/chunks, and Wiki search/read), and will keep adding more HiAgent OpenAPI capabilities over time.
 
 ## Features
 
-- List knowledge bases (datasets) in a workspace
-- Inspect a single dataset, including its default retrieval parameters
-- Search knowledge in one or more datasets via the knowledge engine (`knowledge_search`)
+- List knowledge bases (datasets) in a workspace, and inspect a single dataset
+- Discover a knowledge base's supported sub-tools (`list_knowledge_bases`)
+- Search knowledge across datasets by relevance (`search_knowledge`)
+- Match chunks by RE2 regex (`grep_knowledge_chunks`)
+- Read a document's metadata (`get_document_info`) and its chunks in order (`list_document_chunks`)
+- Search generated Wiki pages (`search_wiki`), read a page (`read_wiki_page`), and trace its original source chunks (`read_wiki_source`)
 - Report MCP server and OpenAPI configuration state
+
+### Capability-based tool naming
+
+The HiAgent OpenAPI exposes the knowledge engine through a single `CallKnowledgeEngineTool` action that acts as a dispatcher: its `ToolName` field selects a sub-tool and the request carries a same-named PascalCase parameter object. Instead of surfacing that dispatcher shape, this server maps each `(ToolName, parameter object)` combination to its own capability-named MCP tool with a flat argument schema (all eight verified against a live top server on 2026-08-20):
+
+| MCP tool | OpenAPI action | `ToolName` | Parameter object | Capability |
+|---|---|---|---|---|
+| `list_knowledge_bases` | `CallKnowledgeEngineTool` | `list_knowledge_bases` | — | List KBs + their `AvailableTools` |
+| `search_knowledge` | `CallKnowledgeEngineTool` | `knowledge_search` | `KnowledgeSearch` | Relevance search across datasets |
+| `grep_knowledge_chunks` | `CallKnowledgeEngineTool` | `grep_chunks` | `GrepChunks` | RE2 regex match over candidate chunks |
+| `get_document_info` | `CallKnowledgeEngineTool` | `get_doc_info` | `GetDocInfo` | One document's metadata |
+| `list_document_chunks` | `CallKnowledgeEngineTool` | `list_knowledge_chunks` | `ListKnowledgeChunks` | Sequential read of one document's chunks |
+| `search_wiki` | `CallKnowledgeEngineTool` | `wiki_search` | `WikiSearch` | Search generated Wiki pages |
+| `read_wiki_page` | `CallKnowledgeEngineTool` | `wiki_read_page` | `WikiReadPage` | Read a Wiki page by slug |
+| `read_wiki_source` | `CallKnowledgeEngineTool` | `wiki_read_source_doc` | `WikiReadSourceDoc` | Read a Wiki page's original source chunks |
+
+> Note: in HiAgent a *dataset* is a *knowledge base*, so `list_datasets` / `get_dataset` are the "list/inspect knowledge base" capabilities (`list_knowledge_bases` additionally reports each base's `AvailableTools`).
 
 ## Setup
 
@@ -115,15 +135,26 @@ Parameters:
 - `workspace_id` (required): the workspace id the dataset belongs to.
 - `dataset_id` (required): the id of the dataset to inspect.
 
-#### call_knowledge_engine_tool
+#### list_knowledge_bases
 
-Call the HiAgent knowledge engine over one or more datasets. Only `tool_name="knowledge_search"` is supported at present.
+List knowledge bases and the sub-tools each one supports (`AvailableTools`), plus its index types.
 
 ```python
-call_knowledge_engine_tool(
+list_knowledge_bases(workspace_id="workspace_id", dataset_ids=["dataset_id"])
+```
+
+Parameters:
+- `workspace_id` (required): the workspace id the datasets belong to.
+- `dataset_ids` (required): dataset ids to describe, at least one.
+
+#### search_knowledge
+
+Search knowledge across one or more datasets and return the chunks most relevant to your queries.
+
+```python
+search_knowledge(
     workspace_id="workspace_id",
     dataset_ids=["dataset_id"],
-    tool_name="knowledge_search",
     queries=["How to reset my password?"],
     top_k=3,
     score_threshold=0.2,
@@ -133,42 +164,125 @@ call_knowledge_engine_tool(
 Parameters:
 - `workspace_id` (required): the workspace id the datasets belong to.
 - `dataset_ids` (required): list of dataset ids to search, at least one.
-- `tool_name` (optional): sub-tool name, defaults to `knowledge_search`. Only `knowledge_search` is supported at present; other known sub-tools (`list_knowledge_chunks`, `grep_chunks`, `get_doc_info`, `wiki_search`, `wiki_read_page`, `wiki_read_source_doc`) are recognized but rejected.
-- `queries` (optional): list of query strings (required for `knowledge_search`).
+- `queries` (required): list of natural-language query strings, at least one.
 - `top_k` (optional): maximum number of results to return.
-- `score_threshold` (optional): relevance score threshold (0~1).
+- `score_threshold` (optional): minimum relevance score to keep (0~1).
 - `rerank_id` (optional): rerank model id.
 - `knowledge_run_mode` (optional): run mode, one of `quick` / `smart_search` / `wiki_search`.
 
-## Best Practices & Test Prompts
+#### grep_knowledge_chunks
 
-Recommended usage pattern and, for each exposed tool, a natural-language prompt you can give an MCP-enabled agent to exercise it plus the expected result. These prompts double as a manual smoke test after wiring the server into a client.
+Match knowledge chunks by one RE2 regular expression. Use for exact tokens (error codes, identifiers, fixed phrases) when semantic search is insufficient. Narrows candidates first, then applies the pattern — not an exhaustive full-dataset scan.
 
-**Recommended flow:** `health_check` (confirm config) → `list_datasets` (discover `DatasetIDs`) → optionally `get_dataset` (read default retrieval params) → `call_knowledge_engine_tool` (retrieve). `WorkspaceID` is not discoverable via this server — take it from the HiAgent console URL (`.../workspace/<id>/...`).
+```python
+grep_knowledge_chunks(
+    workspace_id="workspace_id",
+    dataset_ids=["dataset_id"],
+    pattern="ERR\\d+",
+    queries=["error code"],
+    limit=10,
+)
+```
 
-#### health_check
+Parameters:
+- `workspace_id` (required): the workspace id the datasets belong to.
+- `dataset_ids` (required): dataset ids to search, at least one.
+- `pattern` (required): one RE2 regular expression (no backreferences/lookarounds).
+- `queries` (optional): queries to narrow the candidate set.
+- `limit` (optional): maximum number of matches.
 
-- **Best practice:** call it first, before any credentialed tool, to confirm the server sees your AK/SK and top host. It never calls the OpenAPI and never echoes secrets — only booleans.
-- **Test prompt:** "Check whether the HiAgent MCP server is healthy and properly configured."
-- **Expected result:** `status="ok"`, `auth="aksk"`, and `configured=true` with each `*_configured` flag true when env vars are set; no credential values are returned.
+#### get_document_info
 
-#### list_datasets
+Get one document's metadata (title, type, size, status, segment count, timestamps). Metadata only — not document content.
 
-- **Best practice:** use it to discover the `DatasetIDs` required by `call_knowledge_engine_tool`; page with `page_number`/`page_size` (1–100) instead of requesting everything at once. `dataset` == knowledge base.
-- **Test prompt:** "List the knowledge bases in workspace `<workspace_id>`."
-- **Expected result:** a paged list of datasets, each with its id and name, that you can feed into the knowledge engine.
+```python
+get_document_info(
+    workspace_id="workspace_id",
+    dataset_ids=["dataset_id"],
+    resource_id="resource_id",
+)
+```
 
-#### get_dataset
+Parameters:
+- `workspace_id` (required): the workspace id the datasets belong to.
+- `dataset_ids` (required): dataset ids the document belongs to, at least one.
+- `resource_id` (required): the document/resource id (from an earlier tool result).
 
-- **Best practice:** call it when you want a dataset's default retrieval parameters (e.g. `RetrievalTopK`, `RetrievalScoreThreshold`) so your `call_knowledge_engine_tool` arguments match how the base was configured.
-- **Test prompt:** "Show the details and default retrieval settings of dataset `<dataset_id>` in workspace `<workspace_id>`."
-- **Expected result:** the dataset's metadata including its default retrieval parameters.
+#### list_document_chunks
 
-#### call_knowledge_engine_tool
+List the knowledge chunks of a single document/resource in reading order. Unlike `search_knowledge` (relevance-ranked for a query), this walks one resource sequentially — useful for browsing a document's full content.
 
-- **Best practice:** pass 1–5 short, self-contained `queries` (not a whole conversation); start with a small `top_k` (e.g. 3) and a modest `score_threshold` (e.g. 0.2), then tune. Only `tool_name="knowledge_search"` is supported in this version.
-- **Test prompt:** "Search datasets `[<dataset_id>]` in workspace `<workspace_id>` for \"How do I reset my password?\" and return the top 3 chunks."
-- **Expected result:** a `Result.KnowledgeSearch.Hits[]` payload where each hit carries `DatasetID` / `DocumentID` / `SegmentID` / `Content`; an unsupported `tool_name` is rejected with a clear error, and invalid arguments (empty `queries`, `score_threshold` outside 0–1) raise a validation error.
+```python
+list_document_chunks(
+    workspace_id="workspace_id",
+    dataset_ids=["dataset_id"],
+    resource_id="resource_id",
+    limit=50,
+)
+```
+
+Parameters:
+- `workspace_id` (required): the workspace id the datasets belong to.
+- `dataset_ids` (required): list of dataset ids the resource belongs to, at least one.
+- `resource_id` (required): the document/resource whose chunks to list.
+- `limit` (optional): maximum number of chunks per page.
+- `cursor_segment_id` (optional): segment id to continue paging from (pass the last returned segment id).
+
+#### search_wiki
+
+Search generated Wiki pages for concepts and topic pages. Returns page candidates (with `Slug`) for navigation, not final evidence.
+
+```python
+search_wiki(
+    workspace_id="workspace_id",
+    dataset_ids=["dataset_id"],
+    queries=["reverse acquisition"],
+    limit=5,
+)
+```
+
+Parameters:
+- `workspace_id` (required): the workspace id the datasets belong to.
+- `dataset_ids` (required): dataset ids to search, at least one.
+- `queries` (required): natural-language query strings, at least one.
+- `limit` (optional): maximum number of pages.
+
+#### read_wiki_page
+
+Read one generated Wiki page by slug (structure, summary, content). Wiki pages are generated navigation material, not final evidence.
+
+```python
+read_wiki_page(
+    workspace_id="workspace_id",
+    dataset_ids=["dataset_id"],
+    slug="concept/reverse-acquisition",
+)
+```
+
+Parameters:
+- `workspace_id` (required): the workspace id the datasets belong to.
+- `dataset_ids` (required): dataset ids the page belongs to, at least one.
+- `slug` (required): the Wiki page slug (from `search_wiki`).
+
+#### read_wiki_source
+
+Read the original source chunks referenced by a Wiki page — the final evidence for facts, numbers, quotations and code.
+
+```python
+read_wiki_source(
+    workspace_id="workspace_id",
+    dataset_ids=["dataset_id"],
+    slug="concept/reverse-acquisition",
+    limit=5,
+)
+```
+
+Parameters:
+- `workspace_id` (required): the workspace id the datasets belong to.
+- `dataset_ids` (required): dataset ids the page belongs to, at least one.
+- `slug` (required): the Wiki page slug whose sources to read.
+- `limit` (optional): maximum number of source chunks per page.
+- `cursor_segment_id` (optional): segment id to continue paging from.
 
 ## MCP Integration
 
