@@ -14,7 +14,7 @@ HiAgent MCP Server 是一个模型上下文协议（Model Context Protocol）服
 - 查看某知识库支持的子工具（`list_knowledge_bases`，返回 `AvailableTools`）
 - 在一个或多个知识库中按相关性检索知识片段（`search_knowledge`）
 - 按 RE2 正则匹配切片（`grep_knowledge_chunks`）
-- 读取文档元数据（`get_document_info`）与按顺序读取文档切片（`list_document_chunks`）
+- 批量读取文档元数据（`list_document_infos`）与按顺序读取文档切片（`list_document_chunks`）
 - 搜索生成的 Wiki 页面（`search_wiki`）、读取 Wiki 页面（`read_wiki_page`）、溯源 Wiki 引用的原始文档切片（`read_wiki_source`）
 - 查看 MCP Server 与 OpenAPI 的配置状态
 
@@ -27,7 +27,7 @@ HiAgent OpenAPI 通过单个 `CallKnowledgeEngineTool` action 以「分发器」
 | `list_knowledge_bases` | `CallKnowledgeEngineTool` | `list_knowledge_bases` | — | 列知识库及其 `AvailableTools` |
 | `search_knowledge` | `CallKnowledgeEngineTool` | `knowledge_search` | `KnowledgeSearch` | 跨知识库按相关性检索 |
 | `grep_knowledge_chunks` | `CallKnowledgeEngineTool` | `grep_chunks` | `GrepChunks` | 候选切片内 RE2 正则匹配 |
-| `get_document_info` | `CallKnowledgeEngineTool` | `get_doc_info` | `GetDocInfo` | 单文档元数据 |
+| `list_document_infos` | `CallKnowledgeEngineTool` | `list_doc_infos` | `ListDocInfos` | 按知识库批量查文档元数据 |
 | `list_document_chunks` | `CallKnowledgeEngineTool` | `list_knowledge_chunks` | `ListKnowledgeChunks` | 顺序读取单个文档的分片 |
 | `search_wiki` | `CallKnowledgeEngineTool` | `wiki_search` | `WikiSearch` | 搜索生成的 Wiki 页面 |
 | `read_wiki_page` | `CallKnowledgeEngineTool` | `wiki_read_page` | `WikiReadPage` | 按 slug 读取 Wiki 页面 |
@@ -102,7 +102,7 @@ HiAgent MCP Server 提供以下功能：
 - `list_knowledge_bases`: 列出知识库及其支持的子工具（`AvailableTools`）
 - `search_knowledge`: 在一个或多个知识库中按相关性检索知识片段
 - `grep_knowledge_chunks`: 按 RE2 正则匹配知识切片
-- `get_document_info`: 获取单个文档的元数据
+- `list_document_infos`: 按知识库批量获取文档元数据
 - `list_document_chunks`: 按顺序列出单个文档/资源的知识分片
 - `search_wiki`: 搜索生成的 Wiki 页面
 - `read_wiki_page`: 按 slug 读取 Wiki 页面
@@ -194,22 +194,22 @@ Parameters:
 - `queries` (可选): 用于缩小候选集的查询词
 - `limit` (可选): 命中上限
 
-#### get_document_info
+#### list_document_infos
 
-获取单个文档的元数据（标题、类型、大小、状态、分段数、时间戳）。仅元数据，非文档内容。
+按知识库批量获取一个或多个文档的元数据（标题、类型、大小、状态、分段数、时间戳）。仅元数据，非文档内容。
 
 ```python
-get_document_info(
+list_document_infos(
     workspace_id="workspace_id",
     dataset_ids=["dataset_id"],
-    resource_id="resource_id",
+    resource_ids={"dataset_id": ["resource_id_1", "resource_id_2"]},
 )
 ```
 
 Parameters:
 - `workspace_id` (必须): 知识库所属的 workspace ID
-- `dataset_ids` (必须): 文档所属的知识库 ID 列表，至少 1 个
-- `resource_id` (必须): 文档/资源 ID（来自前序工具结果）
+- `dataset_ids` (必须): 涉及的知识库 ID 列表，至少 1 个
+- `resource_ids` (必须): 知识库 ID → 该库下文档/资源 ID 列表的映射；key 必须在 `dataset_ids` 内
 
 #### list_document_chunks
 

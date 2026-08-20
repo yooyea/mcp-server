@@ -27,7 +27,7 @@ def test_server_registers_knowledge_engine_tools() -> None:
         "list_knowledge_bases",
         "search_knowledge",
         "grep_knowledge_chunks",
-        "get_document_info",
+        "list_document_infos",
         "list_document_chunks",
         "search_wiki",
         "read_wiki_page",

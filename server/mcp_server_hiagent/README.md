@@ -8,7 +8,7 @@ This MCP server wraps HiAgent Platform OpenAPI capabilities as MCP tools. Each t
 - Discover a knowledge base's supported sub-tools (`list_knowledge_bases`)
 - Search knowledge across datasets by relevance (`search_knowledge`)
 - Match chunks by RE2 regex (`grep_knowledge_chunks`)
-- Read a document's metadata (`get_document_info`) and its chunks in order (`list_document_chunks`)
+- Read documents' metadata in batch (`list_document_infos`) and a document's chunks in order (`list_document_chunks`)
 - Search generated Wiki pages (`search_wiki`), read a page (`read_wiki_page`), and trace its original source chunks (`read_wiki_source`)
 - Report MCP server and OpenAPI configuration state
 
@@ -21,7 +21,7 @@ The HiAgent OpenAPI exposes the knowledge engine through a single `CallKnowledge
 | `list_knowledge_bases` | `CallKnowledgeEngineTool` | `list_knowledge_bases` | — | List KBs + their `AvailableTools` |
 | `search_knowledge` | `CallKnowledgeEngineTool` | `knowledge_search` | `KnowledgeSearch` | Relevance search across datasets |
 | `grep_knowledge_chunks` | `CallKnowledgeEngineTool` | `grep_chunks` | `GrepChunks` | RE2 regex match over candidate chunks |
-| `get_document_info` | `CallKnowledgeEngineTool` | `get_doc_info` | `GetDocInfo` | One document's metadata |
+| `list_document_infos` | `CallKnowledgeEngineTool` | `list_doc_infos` | `ListDocInfos` | Documents' metadata, batched by dataset |
 | `list_document_chunks` | `CallKnowledgeEngineTool` | `list_knowledge_chunks` | `ListKnowledgeChunks` | Sequential read of one document's chunks |
 | `search_wiki` | `CallKnowledgeEngineTool` | `wiki_search` | `WikiSearch` | Search generated Wiki pages |
 | `read_wiki_page` | `CallKnowledgeEngineTool` | `wiki_read_page` | `WikiReadPage` | Read a Wiki page by slug |
@@ -191,22 +191,22 @@ Parameters:
 - `queries` (optional): queries to narrow the candidate set.
 - `limit` (optional): maximum number of matches.
 
-#### get_document_info
+#### list_document_infos
 
-Get one document's metadata (title, type, size, status, segment count, timestamps). Metadata only — not document content.
+Get metadata for one or more documents, batched by dataset (title, type, size, status, segment count, timestamps). Metadata only — not document content.
 
 ```python
-get_document_info(
+list_document_infos(
     workspace_id="workspace_id",
     dataset_ids=["dataset_id"],
-    resource_id="resource_id",
+    resource_ids={"dataset_id": ["resource_id_1", "resource_id_2"]},
 )
 ```
 
 Parameters:
 - `workspace_id` (required): the workspace id the datasets belong to.
-- `dataset_ids` (required): dataset ids the document belongs to, at least one.
-- `resource_id` (required): the document/resource id (from an earlier tool result).
+- `dataset_ids` (required): dataset ids involved, at least one.
+- `resource_ids` (required): map of dataset id → list of document/resource ids to describe; keys must be within `dataset_ids`.
 
 #### list_document_chunks
 

@@ -15,7 +15,7 @@ Capability tool  -> ToolName            -> parameter object
   list_knowledge_bases  -> list_knowledge_bases  (no argument object)
   search_knowledge      -> knowledge_search      -> KnowledgeSearch
   grep_knowledge_chunks -> grep_chunks           -> GrepChunks
-  get_document_info     -> get_doc_info          -> GetDocInfo
+  list_document_infos   -> list_doc_infos         -> ListDocInfos
   list_document_chunks  -> list_knowledge_chunks -> ListKnowledgeChunks
   search_wiki           -> wiki_search           -> WikiSearch
   read_wiki_page        -> wiki_read_page        -> WikiReadPage
@@ -24,7 +24,7 @@ Capability tool  -> ToolName            -> parameter object
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 
 from fastmcp import FastMCP
 
@@ -44,7 +44,7 @@ KNOWN_TOOL_NAMES = (
     "list_knowledge_bases",
     "knowledge_search",
     "grep_chunks",
-    "get_doc_info",
+    "list_doc_infos",
     "list_knowledge_chunks",
     "wiki_search",
     "wiki_read_page",
@@ -202,29 +202,41 @@ def grep_knowledge_chunks(
     )
 
 
-def get_document_info(
+def list_document_infos(
     client: OpenAPIClient,
     *,
     workspace_id: str,
     dataset_ids: Sequence[str],
-    resource_id: str,
+    resource_ids: Mapping[str, Sequence[str]],
 ) -> dict[str, object]:
-    """Read one document's metadata (CallKnowledgeEngineTool/get_doc_info).
+    """Read metadata for documents, batched by dataset
+    (CallKnowledgeEngineTool/list_doc_infos).
 
-    Returns title/type/size/status/segment count/timestamps. Metadata only, not
-    document content.
+    ``resource_ids`` maps each dataset id to the resource ids to describe; its
+    keys must be within ``dataset_ids``. Returns each document's title/type/size/
+    status/segment count/timestamps. Metadata only, not document content.
     """
 
-    if not resource_id:
-        raise ValueError("resource_id is required")
+    if not resource_ids:
+        raise ValueError("resource_ids must contain at least one dataset entry")
+    normalized: dict[str, list[str]] = {}
+    for dataset_id, ids in resource_ids.items():
+        if not dataset_id:
+            raise ValueError("resource_ids keys (dataset ids) must be non-empty")
+        id_list = list(ids)
+        if not id_list:
+            raise ValueError(
+                f"resource_ids[{dataset_id!r}] must contain at least one resource id"
+            )
+        normalized[dataset_id] = id_list
 
     return _call_knowledge_engine(
         client,
         workspace_id=workspace_id,
         dataset_ids=dataset_ids,
-        tool_name="get_doc_info",
-        parameter_field="GetDocInfo",
-        parameter_object={"ResourceID": resource_id},
+        tool_name="list_doc_infos",
+        parameter_field="ListDocInfos",
+        parameter_object={"ResourceIDs": normalized},
     )
 
 
@@ -378,7 +390,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         """List knowledge bases and the sub-tools each supports.
 
         Returns each base's index types and ``AvailableTools`` (which of
-        search_knowledge / grep_knowledge_chunks / get_document_info /
+        search_knowledge / grep_knowledge_chunks / list_document_infos /
         list_document_chunks / search_wiki / read_wiki_page / read_wiki_source
         it supports).
         """
@@ -453,26 +465,29 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
             limit=limit,
         )
 
-    @mcp.tool(name="get_document_info")
-    def get_document_info_tool(
+    @mcp.tool(name="list_document_infos")
+    def list_document_infos_tool(
         workspace_id: str,
         dataset_ids: list[str],
-        resource_id: str,
+        resource_ids: dict[str, list[str]],
     ) -> dict[str, object]:
-        """Get one document's metadata (title, type, size, status, segment
-        count, timestamps). Metadata only — not document content.
+        """Get metadata for one or more documents, batched by dataset.
+
+        Returns each document's title, type, size, status, segment count and
+        timestamps. Metadata only — not document content.
 
         Parameters:
         - workspace_id: workspace the datasets belong to.
-        - dataset_ids: dataset ids the document belongs to, at least one.
-        - resource_id: the document/resource id (from an earlier tool result).
+        - dataset_ids: dataset ids involved, at least one.
+        - resource_ids: map of dataset id -> list of document/resource ids to
+          describe; its keys must be within ``dataset_ids``.
         """
 
-        return get_document_info(
+        return list_document_infos(
             client,
             workspace_id=workspace_id,
             dataset_ids=dataset_ids,
-            resource_id=resource_id,
+            resource_ids=resource_ids,
         )
 
     @mcp.tool(name="list_document_chunks")

@@ -6,7 +6,7 @@ import pytest
 
 from mcp_server_hiagent.versions.v3_1_0.tools.knowledge import (
     KNOWN_TOOL_NAMES,
-    get_document_info,
+    list_document_infos,
     grep_knowledge_chunks,
     list_document_chunks,
     list_knowledge_bases,
@@ -184,33 +184,38 @@ def test_grep_rejects_non_positive_limit() -> None:
         )
 
 
-# --- get_document_info (get_doc_info) ---------------------------------------
+# --- list_document_infos (list_doc_infos) -----------------------------------
 
 
-def test_get_document_info_request() -> None:
+def test_list_document_infos_request() -> None:
     client = RecordingClient()
-    get_document_info(
-        client, workspace_id="ws-1", dataset_ids=["ds-1"], resource_id="res-1"
+    list_document_infos(
+        client,
+        workspace_id="ws-1",
+        dataset_ids=["ds-1", "ds-2"],
+        resource_ids={"ds-1": ["r-1", "r-2"], "ds-2": ["r-3"]},
     )
     assert client.calls[0]["body"] == {
         "WorkspaceID": "ws-1",
-        "DatasetIDs": ["ds-1"],
-        "ToolName": "get_doc_info",
-        "GetDocInfo": {"ResourceID": "res-1"},
+        "DatasetIDs": ["ds-1", "ds-2"],
+        "ToolName": "list_doc_infos",
+        "ListDocInfos": {"ResourceIDs": {"ds-1": ["r-1", "r-2"], "ds-2": ["r-3"]}},
     }
 
 
 @pytest.mark.parametrize(
     "kwargs",
     [
-        {"workspace_id": "", "dataset_ids": ["ds-1"], "resource_id": "r"},
-        {"workspace_id": "ws-1", "dataset_ids": [], "resource_id": "r"},
-        {"workspace_id": "ws-1", "dataset_ids": ["ds-1"], "resource_id": ""},
+        {"workspace_id": "", "dataset_ids": ["ds-1"], "resource_ids": {"ds-1": ["r"]}},
+        {"workspace_id": "ws-1", "dataset_ids": [], "resource_ids": {"ds-1": ["r"]}},
+        {"workspace_id": "ws-1", "dataset_ids": ["ds-1"], "resource_ids": {}},
+        {"workspace_id": "ws-1", "dataset_ids": ["ds-1"], "resource_ids": {"ds-1": []}},
+        {"workspace_id": "ws-1", "dataset_ids": ["ds-1"], "resource_ids": {"": ["r"]}},
     ],
 )
-def test_get_document_info_required_fields(kwargs: dict[str, Any]) -> None:
+def test_list_document_infos_required_fields(kwargs: dict[str, Any]) -> None:
     with pytest.raises(ValueError):
-        get_document_info(RecordingClient(), **kwargs)
+        list_document_infos(RecordingClient(), **kwargs)
 
 
 # --- list_document_chunks (list_knowledge_chunks) ---------------------------
@@ -388,7 +393,7 @@ def test_known_tool_names_cover_all_eight() -> None:
         "list_knowledge_bases",
         "knowledge_search",
         "grep_chunks",
-        "get_doc_info",
+        "list_doc_infos",
         "list_knowledge_chunks",
         "wiki_search",
         "wiki_read_page",
