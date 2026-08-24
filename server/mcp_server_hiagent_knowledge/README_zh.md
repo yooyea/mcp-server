@@ -2,7 +2,7 @@
 
 ## 产品描述
 
-HiAgent Knowledge MCP Server 是一个模型上下文协议（Model Context Protocol）服务器，将**知识库（知识引擎）**能力封装为标准 MCP 工具，供 MCP 客户端（如 Claude Desktop、Cursor，以及 HiAgent 平台的 MCP 插件）使用。本 Server **仅聚焦知识库检索**、不面向完整的 HiAgent 平台——知识库后续可能独立成为单独产品，因此命名为「HiAgent Knowledge」，不与任何单一产品耦合。每个工具都按其对用户暴露的**能力**命名，而非直接照搬底层 OpenAPI 的 action 名。当前提供知识库发现（列知识库、查详情）与完整的知识引擎工具集（语义检索、正则匹配、文档元数据/切片、Wiki 检索/阅读）。
+HiAgent Knowledge MCP Server 是一个模型上下文协议（Model Context Protocol）服务器，将**知识库（知识引擎）**能力封装为标准 MCP 工具，供 MCP 客户端（如 Claude Desktop、Cursor，以及 HiAgent 平台的 MCP 插件）使用。每个工具都按其对用户暴露的**能力**命名，而非直接照搬底层 OpenAPI 的 action 名。当前提供知识库发现（列知识库、查详情）与完整的知识引擎工具集（语义检索、正则匹配、文档元数据/切片、Wiki 检索/阅读）。
 
 ## 分类
 
