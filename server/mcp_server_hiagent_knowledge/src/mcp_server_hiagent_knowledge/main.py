@@ -6,7 +6,7 @@ import argparse
 import logging
 import os
 
-from mcp_server_hiagent.versions import (
+from mcp_server_hiagent_knowledge.versions import (
     DEFAULT_VERSION,
     SUPPORTED_VERSIONS,
     load_version_module,

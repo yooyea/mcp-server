@@ -47,4 +47,4 @@ def load_version_module(version: str) -> ModuleType:
             f"unsupported HIAGENT_VERSION {version!r}; "
             f"supported versions: {', '.join(SUPPORTED_VERSIONS)}"
         )
-    return import_module(f"mcp_server_hiagent.versions.{package}")
+    return import_module(f"mcp_server_hiagent_knowledge.versions.{package}")

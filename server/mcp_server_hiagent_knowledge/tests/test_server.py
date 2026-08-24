@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from mcp_server_hiagent.versions.v3_1_0.server import create_mcp_server
+from mcp_server_hiagent_knowledge.versions.v3_1_0.server import create_mcp_server
 
 
 class RecordingClient:

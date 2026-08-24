@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from mcp_server_hiagent.versions.v3_1_0.tools.knowledge import (
+from mcp_server_hiagent_knowledge.versions.v3_1_0.tools.knowledge import (
     KNOWN_TOOL_NAMES,
     list_document_infos,
     grep_knowledge_chunks,

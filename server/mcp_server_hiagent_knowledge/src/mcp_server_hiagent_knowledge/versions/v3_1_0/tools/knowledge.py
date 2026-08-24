@@ -28,7 +28,7 @@ from collections.abc import Mapping, Sequence
 
 from fastmcp import FastMCP
 
-from mcp_server_hiagent.versions.v3_1_0.tools._common import (
+from mcp_server_hiagent_knowledge.versions.v3_1_0.tools._common import (
     OPENAPI_SERVICE,
     OPENAPI_VERSION,
     OpenAPIClient,
@@ -387,12 +387,12 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         workspace_id: str,
         dataset_ids: list[str],
     ) -> dict[str, object]:
-        """列出知识库及各库支持的子工具。
+        """List knowledge bases and the sub-tools each supports.
 
-        返回每个库的索引类型与 ``AvailableTools``（该库支持
+        Returns each base's index types and ``AvailableTools`` (which of
         search_knowledge / grep_knowledge_chunks / list_document_infos /
         list_document_chunks / search_wiki / read_wiki_page / read_wiki_source
-        中的哪些）。
+        it supports).
         """
 
         return list_knowledge_bases(
@@ -409,18 +409,18 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         rerank_id: str | None = None,
         knowledge_run_mode: str | None = None,
     ) -> dict[str, object]:
-        """在一个或多个知识库中检索，返回最相关的知识片段。
+        """Search knowledge across datasets and return the most relevant chunks.
 
-        用 ``list_datasets`` / ``list_knowledge_bases`` 获取知识库 id。
+        Use ``list_datasets`` / ``list_knowledge_bases`` to discover dataset ids.
 
-        参数：
-        - workspace_id：知识库所属的 workspace。
-        - dataset_ids：要检索的知识库 id 列表，至少 1 个。
-        - queries：自然语言查询词，至少 1 条。
-        - top_k：返回的最大片段数。
-        - score_threshold：保留结果的最小相关性分数（0~1）。
-        - rerank_id：可选的重排模型 id。
-        - knowledge_run_mode：quick / smart_search / wiki_search。
+        Parameters:
+        - workspace_id: workspace the datasets belong to.
+        - dataset_ids: dataset ids to search, at least one.
+        - queries: natural-language query strings, at least one.
+        - top_k: max number of chunks to return.
+        - score_threshold: minimum relevance score to keep (0~1).
+        - rerank_id: optional rerank model id.
+        - knowledge_run_mode: quick / smart_search / wiki_search.
         """
 
         return search_knowledge(
@@ -442,17 +442,18 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         queries: list[str] | None = None,
         limit: int | None = None,
     ) -> dict[str, object]:
-        """用一条 RE2 正则匹配知识片段。
+        """Match knowledge chunks by an RE2 regular expression.
 
-        用于语义检索不足时的精确 token 定位（错误码、函数名、标识符、固定短语）。
-        先召回候选再应用 ``pattern`` —— 不是对全库的穷尽扫描。
+        Use for exact tokens (error codes, function names, identifiers, fixed
+        phrases) when semantic search is insufficient. Narrows candidates first,
+        then applies ``pattern`` — not an exhaustive full-dataset scan.
 
-        参数：
-        - workspace_id：知识库所属的 workspace。
-        - dataset_ids：要检索的知识库 id 列表，至少 1 个。
-        - pattern：一条 RE2 正则（不支持反向引用/前后瞻）。
-        - queries：可选，用于缩小候选集的查询词。
-        - limit：命中上限。
+        Parameters:
+        - workspace_id: workspace the datasets belong to.
+        - dataset_ids: dataset ids to search, at least one.
+        - pattern: one RE2 regular expression (no backreferences/lookarounds).
+        - queries: optional queries to narrow the candidate set.
+        - limit: max number of matches.
         """
 
         return grep_knowledge_chunks(
@@ -470,15 +471,16 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         dataset_ids: list[str],
         resource_ids: dict[str, list[str]],
     ) -> dict[str, object]:
-        """按知识库批量获取一个或多个文档的元数据。
+        """Get metadata for one or more documents, batched by dataset.
 
-        返回每个文档的标题、类型、大小、状态、分段数与时间戳。仅元数据，非文档内容。
+        Returns each document's title, type, size, status, segment count and
+        timestamps. Metadata only — not document content.
 
-        参数：
-        - workspace_id：知识库所属的 workspace。
-        - dataset_ids：涉及的知识库 id 列表，至少 1 个。
-        - resource_ids：知识库 id -> 该库下文档/资源 id 列表 的映射；
-          其 key 必须在 ``dataset_ids`` 内。
+        Parameters:
+        - workspace_id: workspace the datasets belong to.
+        - dataset_ids: dataset ids involved, at least one.
+        - resource_ids: map of dataset id -> list of document/resource ids to
+          describe; its keys must be within ``dataset_ids``.
         """
 
         return list_document_infos(
@@ -496,17 +498,18 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         limit: int | None = None,
         cursor_segment_id: str | None = None,
     ) -> dict[str, object]:
-        """按阅读顺序列出单个文档的知识片段。
+        """List one document's knowledge chunks in reading order.
 
-        与 ``search_knowledge``（按相关性排序）不同，本工具顺序遍历一个
-        ``resource_id``。用上一页返回的 segment id 作为 ``cursor_segment_id`` 续页。
+        Unlike ``search_knowledge`` (relevance-ranked), this reads one
+        ``resource_id`` sequentially. Page forward with the last returned
+        segment id as ``cursor_segment_id``.
 
-        参数：
-        - workspace_id：知识库所属的 workspace。
-        - dataset_ids：资源所属的知识库 id 列表，至少 1 个。
-        - resource_id：要列出分片的文档/资源。
-        - limit：每页最大片段数。
-        - cursor_segment_id：续页游标。
+        Parameters:
+        - workspace_id: workspace the datasets belong to.
+        - dataset_ids: dataset ids the resource belongs to, at least one.
+        - resource_id: the document/resource whose chunks to list.
+        - limit: max number of chunks per page.
+        - cursor_segment_id: segment id to continue paging from.
         """
 
         return list_document_chunks(
@@ -525,16 +528,17 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         queries: list[str],
         limit: int | None = None,
     ) -> dict[str, object]:
-        """搜索生成的 Wiki 页面，用于概念与主题页导航。
+        """Search generated Wiki pages for concepts and topic pages.
 
-        返回 Wiki 页面候选（含 ``Slug``），用于导航而非最终证据。用
-        ``read_wiki_page`` 阅读页面，再用 ``read_wiki_source`` 溯源原文。
+        Returns Wiki page candidates (with ``Slug``) for navigation, not final
+        evidence. Read a page with ``read_wiki_page``, then trace originals with
+        ``read_wiki_source``.
 
-        参数：
-        - workspace_id：知识库所属的 workspace。
-        - dataset_ids：要检索的知识库 id 列表，至少 1 个。
-        - queries：自然语言查询词，至少 1 条。
-        - limit：返回页面上限。
+        Parameters:
+        - workspace_id: workspace the datasets belong to.
+        - dataset_ids: dataset ids to search, at least one.
+        - queries: natural-language query strings, at least one.
+        - limit: max number of pages.
         """
 
         return search_wiki(
@@ -551,15 +555,15 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         dataset_ids: list[str],
         slug: str,
     ) -> dict[str, object]:
-        """按 slug 读取单个生成的 Wiki 页面（结构、摘要、内容）。
+        """Read one generated Wiki page by slug (structure, summary, content).
 
-        Wiki 页面是生成的导航材料，非最终证据；在给出事实前先用
-        ``read_wiki_source`` 读取原始来源。
+        Wiki pages are generated navigation material, not final evidence; read
+        original sources with ``read_wiki_source`` before answering with facts.
 
-        参数：
-        - workspace_id：知识库所属的 workspace。
-        - dataset_ids：页面所属的知识库 id 列表，至少 1 个。
-        - slug：Wiki 页面 slug（来自 ``search_wiki``）。
+        Parameters:
+        - workspace_id: workspace the datasets belong to.
+        - dataset_ids: dataset ids the page belongs to, at least one.
+        - slug: the Wiki page slug (from ``search_wiki``).
         """
 
         return read_wiki_page(
@@ -577,16 +581,17 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         limit: int | None = None,
         cursor_segment_id: str | None = None,
     ) -> dict[str, object]:
-        """读取某个 Wiki 页面引用的原始文档切片。
+        """Read the original source chunks referenced by a Wiki page.
 
-        这些切片是事实、数字、引文与代码的最终证据。用 ``cursor_segment_id`` 续页。
+        These chunks are the final evidence for facts, numbers, quotations and
+        code. Page forward with ``cursor_segment_id``.
 
-        参数：
-        - workspace_id：知识库所属的 workspace。
-        - dataset_ids：页面所属的知识库 id 列表，至少 1 个。
-        - slug：要读取来源的 Wiki 页面 slug。
-        - limit：每页最大源切片数。
-        - cursor_segment_id：续页游标。
+        Parameters:
+        - workspace_id: workspace the datasets belong to.
+        - dataset_ids: dataset ids the page belongs to, at least one.
+        - slug: the Wiki page slug whose sources to read.
+        - limit: max number of source chunks per page.
+        - cursor_segment_id: segment id to continue paging from.
         """
 
         return read_wiki_source(

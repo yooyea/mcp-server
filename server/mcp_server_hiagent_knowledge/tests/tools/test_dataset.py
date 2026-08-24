@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from mcp_server_hiagent.versions.v3_1_0.tools.dataset import get_dataset, list_datasets
+from mcp_server_hiagent_knowledge.versions.v3_1_0.tools.dataset import get_dataset, list_datasets
 
 
 class RecordingClient:

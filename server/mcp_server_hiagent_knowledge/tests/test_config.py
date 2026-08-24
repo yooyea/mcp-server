@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from mcp_server_hiagent.versions.v3_1_0.config import (
+from mcp_server_hiagent_knowledge.versions.v3_1_0.config import (
     DEFAULT_ACCOUNT_ID,
     DEFAULT_REGION,
     load_hiagent_config,
