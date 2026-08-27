@@ -69,7 +69,7 @@ def register_dataset_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         page_number: int = 1,
         page_size: int = 20,
     ) -> dict[str, object]:
-        """List HiAgent datasets (knowledge bases) in a workspace."""
+        """列出某个 workspace 下的 HiAgent 知识库（dataset），供调用方获取知识引擎所需的 DatasetIDs。"""
 
         return list_datasets(
             client,
@@ -83,7 +83,7 @@ def register_dataset_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         workspace_id: str,
         dataset_id: str,
     ) -> dict[str, object]:
-        """Get one HiAgent dataset, including default retrieval parameters."""
+        """获取单个 HiAgent 知识库的详情，含其默认检索参数。"""
 
         return get_dataset(
             client,

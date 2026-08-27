@@ -339,7 +339,7 @@ def test_read_wiki_page_required_fields(kwargs: dict[str, Any]) -> None:
         read_wiki_page(RecordingClient(), **kwargs)
 
 
-# --- read_wiki_source (wiki_read_source_doc) --------------------------------
+# --- read_wiki_source (wiki_read_source_chunk) ------------------------------
 
 
 def test_read_wiki_source_builds_oneof_request() -> None:
@@ -350,15 +350,17 @@ def test_read_wiki_source_builds_oneof_request() -> None:
         dataset_ids=["ds-1"],
         slug="concept/foo",
         limit=3,
+        overlap=2,
         cursor_segment_id="seg-2",
     )
     assert client.calls[0]["body"] == {
         "WorkspaceID": "ws-1",
         "DatasetIDs": ["ds-1"],
-        "ToolName": "wiki_read_source_doc",
-        "WikiReadSourceDoc": {
+        "ToolName": "wiki_read_source_chunk",
+        "WikiReadSourceChunk": {
             "Slug": "concept/foo",
             "Limit": 3,
+            "Overlap": 2,
             "CursorSegmentID": "seg-2",
         },
     }
@@ -369,7 +371,15 @@ def test_read_wiki_source_omits_optional_fields() -> None:
     read_wiki_source(
         client, workspace_id="ws-1", dataset_ids=["ds-1"], slug="s"
     )
-    assert client.calls[0]["body"]["WikiReadSourceDoc"] == {"Slug": "s"}
+    assert client.calls[0]["body"]["WikiReadSourceChunk"] == {"Slug": "s"}
+
+
+def test_read_wiki_source_allows_zero_overlap() -> None:
+    client = RecordingClient()
+    read_wiki_source(
+        client, workspace_id="ws-1", dataset_ids=["ds-1"], slug="s", overlap=0
+    )
+    assert client.calls[0]["body"]["WikiReadSourceChunk"] == {"Slug": "s", "Overlap": 0}
 
 
 @pytest.mark.parametrize(
@@ -397,7 +407,7 @@ def test_known_tool_names_cover_all_eight() -> None:
         "list_knowledge_chunks",
         "wiki_search",
         "wiki_read_page",
-        "wiki_read_source_doc",
+        "wiki_read_source_chunk",
     }
 
 

@@ -25,7 +25,7 @@ The HiAgent OpenAPI exposes the knowledge engine through a single `CallKnowledge
 | `list_document_chunks` | `CallKnowledgeEngineTool` | `list_knowledge_chunks` | `ListKnowledgeChunks` | Sequential read of one document's chunks |
 | `search_wiki` | `CallKnowledgeEngineTool` | `wiki_search` | `WikiSearch` | Search generated Wiki pages |
 | `read_wiki_page` | `CallKnowledgeEngineTool` | `wiki_read_page` | `WikiReadPage` | Read a Wiki page by slug |
-| `read_wiki_source` | `CallKnowledgeEngineTool` | `wiki_read_source_doc` | `WikiReadSourceDoc` | Read a Wiki page's original source chunks |
+| `read_wiki_source` | `CallKnowledgeEngineTool` | `wiki_read_source_chunk` | `WikiReadSourceChunk` | Read a Wiki page's original source chunks |
 
 > Note: in HiAgent a *dataset* is a *knowledge base*, so `list_datasets` / `get_dataset` are the "list/inspect knowledge base" capabilities (`list_knowledge_bases` additionally reports each base's `AvailableTools`).
 
@@ -274,6 +274,7 @@ read_wiki_source(
     dataset_ids=["dataset_id"],
     slug="concept/reverse-acquisition",
     limit=5,
+    overlap=2,
 )
 ```
 
@@ -282,6 +283,7 @@ Parameters:
 - `dataset_ids` (required): dataset ids the page belongs to, at least one.
 - `slug` (required): the Wiki page slug whose sources to read.
 - `limit` (optional): maximum number of source chunks per page.
+- `overlap` (optional): number of adjacent segments to expand around each referenced chunk for more context (0 disables expansion).
 - `cursor_segment_id` (optional): segment id to continue paging from.
 
 ## MCP Integration

@@ -43,8 +43,8 @@ def create_mcp_server(client: OpenAPIClient | None = None) -> FastMCP:
     @mcp.tool()
     def health_check() -> dict[str, object]:
         """
-        Check whether the HiAgent Knowledge MCP server is running and whether
-        the required knowledge base OpenAPI configuration is present.
+        检查 HiAgent Knowledge MCP Server 是否运行、以及必需的知识库 OpenAPI 配置是否齐备。
+        仅返回状态与各项是否已配置的布尔值，不回显任何凭证明文。
         """
 
         return {

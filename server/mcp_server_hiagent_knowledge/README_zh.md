@@ -31,7 +31,7 @@ HiAgent OpenAPI 通过单个 `CallKnowledgeEngineTool` action 以「分发器」
 | `list_document_chunks` | `CallKnowledgeEngineTool` | `list_knowledge_chunks` | `ListKnowledgeChunks` | 顺序读取单个文档的分片 |
 | `search_wiki` | `CallKnowledgeEngineTool` | `wiki_search` | `WikiSearch` | 搜索生成的 Wiki 页面 |
 | `read_wiki_page` | `CallKnowledgeEngineTool` | `wiki_read_page` | `WikiReadPage` | 按 slug 读取 Wiki 页面 |
-| `read_wiki_source` | `CallKnowledgeEngineTool` | `wiki_read_source_doc` | `WikiReadSourceDoc` | 读取 Wiki 页引用的原始切片 |
+| `read_wiki_source` | `CallKnowledgeEngineTool` | `wiki_read_source_chunk` | `WikiReadSourceChunk` | 读取 Wiki 页引用的原始切片 |
 
 > 说明：HiAgent 中 dataset 即知识库，故 `list_datasets` / `get_dataset` 是「列/查知识库」能力（`list_knowledge_bases` 额外返回各库的 `AvailableTools`）。
 
@@ -277,6 +277,7 @@ read_wiki_source(
     dataset_ids=["dataset_id"],
     slug="concept/reverse-acquisition",
     limit=5,
+    overlap=2,
 )
 ```
 
@@ -285,6 +286,7 @@ Parameters:
 - `dataset_ids` (必须): 页面所属的知识库 ID 列表，至少 1 个
 - `slug` (必须): 要读取来源的 Wiki 页面 slug
 - `limit` (可选): 每页返回的最大源切片数
+- `overlap` (可选): 每个引用切片前后各扩展的邻近分段数，用于补充上下文（0 表示不扩展）
 - `cursor_segment_id` (可选): 续页游标
 
 ### uvx 启动
