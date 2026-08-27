@@ -27,7 +27,8 @@ def test_list_datasets_builds_workspace_request() -> None:
         "service": "app",
         "body": {
             "WorkspaceID": "ws-1",
-            "ListOpt": {"PageNumber": 2, "PageSize": 10},
+            "PageNumber": 2,
+            "PageSize": 10,
         },
     }
 
@@ -37,7 +38,8 @@ def test_list_datasets_defaults() -> None:
 
     list_datasets(client, workspace_id="ws-1")
 
-    assert client.calls[0]["body"]["ListOpt"] == {"PageNumber": 1, "PageSize": 20}
+    assert client.calls[0]["body"]["PageNumber"] == 1
+    assert client.calls[0]["body"]["PageSize"] == 20
 
 
 def test_list_datasets_requires_workspace() -> None:

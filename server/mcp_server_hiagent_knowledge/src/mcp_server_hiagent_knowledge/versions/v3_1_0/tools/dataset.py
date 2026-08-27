@@ -35,7 +35,8 @@ def list_datasets(
         service=OPENAPI_SERVICE,
         body={
             "WorkspaceID": workspace_id,
-            "ListOpt": {"PageNumber": page_number, "PageSize": page_size},
+            "PageNumber": page_number,
+            "PageSize": page_size,
         },
     )
 
