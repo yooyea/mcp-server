@@ -22,12 +22,3 @@ class OpenAPIClient(Protocol):
         service: str | None = None,
         timeout_seconds: float = 30,
     ) -> dict[str, object]: ...
-
-
-def validate_pagination(page_number: int, page_size: int) -> None:
-    """Validate the common HiAgent list pagination contract."""
-
-    if page_number < 1:
-        raise ValueError("page_number must be at least 1")
-    if not 1 <= page_size <= 100:
-        raise ValueError("page_size must be between 1 and 100")

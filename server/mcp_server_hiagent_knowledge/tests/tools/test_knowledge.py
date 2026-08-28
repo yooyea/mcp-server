@@ -83,18 +83,6 @@ def test_search_knowledge_omits_optional_fields() -> None:
     assert "KnowledgeRunMode" not in client.calls[0]["body"]
 
 
-def test_search_knowledge_run_mode() -> None:
-    client = RecordingClient()
-    search_knowledge(
-        client,
-        workspace_id="ws-1",
-        dataset_ids=["ds-1"],
-        queries=["q"],
-        knowledge_run_mode="smart_search",
-    )
-    assert client.calls[0]["body"]["KnowledgeRunMode"] == "smart_search"
-
-
 @pytest.mark.parametrize(
     "kwargs",
     [
@@ -108,27 +96,18 @@ def test_search_knowledge_required_fields(kwargs: dict[str, Any]) -> None:
         search_knowledge(RecordingClient(), **kwargs)
 
 
-@pytest.mark.parametrize("bad", [-0.1, 1.1])
-def test_search_knowledge_score_threshold_range(bad: float) -> None:
-    with pytest.raises(ValueError):
-        search_knowledge(
-            RecordingClient(),
-            workspace_id="ws-1",
-            dataset_ids=["ds-1"],
-            queries=["q"],
-            score_threshold=bad,
-        )
-
-
-def test_search_knowledge_invalid_run_mode() -> None:
-    with pytest.raises(ValueError):
-        search_knowledge(
-            RecordingClient(),
-            workspace_id="ws-1",
-            dataset_ids=["ds-1"],
-            queries=["q"],
-            knowledge_run_mode="nope",
-        )
+def test_search_knowledge_passes_score_threshold_through() -> None:
+    # Value ranges are validated by the OpenAPI layer, not here: any value the
+    # caller provides is forwarded verbatim.
+    client = RecordingClient()
+    search_knowledge(
+        client,
+        workspace_id="ws-1",
+        dataset_ids=["ds-1"],
+        queries=["q"],
+        score_threshold=1.5,
+    )
+    assert client.calls[0]["body"]["KnowledgeSearch"]["ScoreThreshold"] == 1.5
 
 
 # --- grep_knowledge_chunks (grep_chunks) ------------------------------------
@@ -152,6 +131,23 @@ def test_grep_builds_oneof_request() -> None:
     }
 
 
+def test_grep_passes_scope_fields_through() -> None:
+    client = RecordingClient()
+    grep_knowledge_chunks(
+        client,
+        workspace_id="ws-1",
+        dataset_ids=["ds-1"],
+        pattern="p",
+        grep_type="resource_ids",
+        resource_ids=["r-1", "r-2"],
+    )
+    assert client.calls[0]["body"]["GrepChunks"] == {
+        "Pattern": "p",
+        "GrepType": "resource_ids",
+        "ResourceIDs": ["r-1", "r-2"],
+    }
+
+
 def test_grep_omits_optional_fields() -> None:
     client = RecordingClient()
     grep_knowledge_chunks(
@@ -171,17 +167,6 @@ def test_grep_omits_optional_fields() -> None:
 def test_grep_required_fields(kwargs: dict[str, Any]) -> None:
     with pytest.raises(ValueError):
         grep_knowledge_chunks(RecordingClient(), **kwargs)
-
-
-def test_grep_rejects_non_positive_limit() -> None:
-    with pytest.raises(ValueError):
-        grep_knowledge_chunks(
-            RecordingClient(),
-            workspace_id="ws-1",
-            dataset_ids=["ds-1"],
-            pattern="p",
-            limit=0,
-        )
 
 
 # --- list_document_infos (list_doc_infos) -----------------------------------
@@ -262,17 +247,6 @@ def test_list_document_chunks_omits_optional_fields() -> None:
 def test_list_document_chunks_required_fields(kwargs: dict[str, Any]) -> None:
     with pytest.raises(ValueError):
         list_document_chunks(RecordingClient(), **kwargs)
-
-
-def test_list_document_chunks_rejects_non_positive_limit() -> None:
-    with pytest.raises(ValueError):
-        list_document_chunks(
-            RecordingClient(),
-            workspace_id="ws-1",
-            dataset_ids=["ds-1"],
-            resource_id="res-1",
-            limit=0,
-        )
 
 
 # --- search_wiki (wiki_search) ----------------------------------------------

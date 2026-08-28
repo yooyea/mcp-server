@@ -51,9 +51,6 @@ KNOWN_TOOL_NAMES = (
     "wiki_read_source_chunk",
 )
 
-# Valid values for the optional KnowledgeRunMode field.
-KNOWLEDGE_RUN_MODES = ("quick", "smart_search", "wiki_search")
-
 
 def _call_knowledge_engine(
     client: OpenAPIClient,
@@ -63,7 +60,6 @@ def _call_knowledge_engine(
     tool_name: str,
     parameter_field: str | None = None,
     parameter_object: dict[str, object] | None = None,
-    knowledge_run_mode: str | None = None,
     top: int | None = None,
 ) -> dict[str, object]:
     """Assemble and send a ``CallKnowledgeEngineTool`` oneof request.
@@ -72,6 +68,13 @@ def _call_knowledge_engine(
     PascalCase ``parameter_field`` (e.g. ``KnowledgeSearch``); callers pass the
     already-built object so field names stay strictly aligned with the OpenAPI
     contract. ``list_knowledge_bases`` carries no parameter object.
+
+    Argument *values* are not validated here: field ranges, enums and
+    cross-field rules are the OpenAPI (KBS) layer's responsibility and are
+    version-specific, so the server's ``InvalidParameter.*`` errors are passed
+    through to the caller rather than duplicated locally. Only the presence of
+    the fields this server must always send (``WorkspaceID`` / ``DatasetIDs`` /
+    a known ``ToolName``) is asserted.
     """
 
     if not workspace_id:
@@ -82,8 +85,6 @@ def _call_knowledge_engine(
         raise ValueError(
             f"unknown tool_name {tool_name!r}; known tools: {KNOWN_TOOL_NAMES}"
         )
-    if knowledge_run_mode is not None and knowledge_run_mode not in KNOWLEDGE_RUN_MODES:
-        raise ValueError(f"knowledge_run_mode must be one of {KNOWLEDGE_RUN_MODES}")
 
     body: dict[str, object] = {
         "WorkspaceID": workspace_id,
@@ -92,8 +93,6 @@ def _call_knowledge_engine(
     }
     if parameter_field is not None and parameter_object is not None:
         body[parameter_field] = parameter_object
-    if knowledge_run_mode is not None:
-        body["KnowledgeRunMode"] = knowledge_run_mode
     if top is not None:
         body["Top"] = top
 
@@ -138,14 +137,11 @@ def search_knowledge(
     top_k: int | None = None,
     score_threshold: float | None = None,
     rerank_id: str | None = None,
-    knowledge_run_mode: str | None = None,
 ) -> dict[str, object]:
     """Semantic knowledge retrieval (CallKnowledgeEngineTool/knowledge_search)."""
 
     if not queries:
         raise ValueError("queries must contain at least one query")
-    if score_threshold is not None and not 0 <= score_threshold <= 1:
-        raise ValueError("score_threshold must be between 0 and 1")
 
     search: dict[str, object] = {"Queries": list(queries)}
     if top_k is not None:
@@ -162,7 +158,6 @@ def search_knowledge(
         tool_name="knowledge_search",
         parameter_field="KnowledgeSearch",
         parameter_object=search,
-        knowledge_run_mode=knowledge_run_mode,
     )
 
 
@@ -174,23 +169,30 @@ def grep_knowledge_chunks(
     pattern: str,
     queries: Sequence[str] | None = None,
     limit: int | None = None,
+    grep_type: str | None = None,
+    resource_ids: Sequence[str] | None = None,
 ) -> dict[str, object]:
     """Match knowledge chunks by RE2 regex (CallKnowledgeEngineTool/grep_chunks).
 
     Narrows candidates through retrieval, then applies ``pattern``. Not an
-    exhaustive full-dataset scan.
+    exhaustive full-dataset scan. ``grep_type`` selects the scan scope
+    (``dataset_ids`` default, or ``resource_ids`` to restrict to specific
+    documents named in ``resource_ids``); scope rules are enforced by the
+    OpenAPI layer.
     """
 
     if not pattern:
         raise ValueError("pattern is required")
-    if limit is not None and limit < 1:
-        raise ValueError("limit must be at least 1")
 
     grep: dict[str, object] = {"Pattern": pattern}
     if queries:
         grep["Queries"] = list(queries)
     if limit is not None:
         grep["Limit"] = limit
+    if grep_type:
+        grep["GrepType"] = grep_type
+    if resource_ids:
+        grep["ResourceIDs"] = list(resource_ids)
 
     return _call_knowledge_engine(
         client,
@@ -258,8 +260,6 @@ def list_document_chunks(
 
     if not resource_id:
         raise ValueError("resource_id is required")
-    if limit is not None and limit < 1:
-        raise ValueError("limit must be at least 1")
 
     chunks: dict[str, object] = {"ResourceID": resource_id}
     if limit is not None:
@@ -293,8 +293,6 @@ def search_wiki(
 
     if not queries:
         raise ValueError("queries must contain at least one query")
-    if limit is not None and limit < 1:
-        raise ValueError("limit must be at least 1")
 
     wiki: dict[str, object] = {"Queries": list(queries)}
     if limit is not None:
@@ -357,10 +355,6 @@ def read_wiki_source(
 
     if not slug:
         raise ValueError("slug is required")
-    if limit is not None and limit < 1:
-        raise ValueError("limit must be at least 1")
-    if overlap is not None and overlap < 0:
-        raise ValueError("overlap must be at least 0")
 
     src: dict[str, object] = {"Slug": slug}
     if limit is not None:
@@ -413,7 +407,6 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         top_k: int | None = None,
         score_threshold: float | None = None,
         rerank_id: str | None = None,
-        knowledge_run_mode: str | None = None,
     ) -> dict[str, object]:
         """在一个或多个知识库中检索，返回最相关的知识片段。
 
@@ -424,9 +417,8 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         - dataset_ids：要检索的知识库 id 列表，至少 1 个。
         - queries：自然语言查询词，至少 1 条。
         - top_k：返回的最大片段数。
-        - score_threshold：保留结果的最小相关性分数（0~1）。
+        - score_threshold：保留结果的最小相关性分数。
         - rerank_id：可选的重排模型 id。
-        - knowledge_run_mode：quick / smart_search / wiki_search。
         """
 
         return search_knowledge(
@@ -437,7 +429,6 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
             top_k=top_k,
             score_threshold=score_threshold,
             rerank_id=rerank_id,
-            knowledge_run_mode=knowledge_run_mode,
         )
 
     @mcp.tool(name="grep_knowledge_chunks")
@@ -447,6 +438,8 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         pattern: str,
         queries: list[str] | None = None,
         limit: int | None = None,
+        grep_type: str | None = None,
+        resource_ids: list[str] | None = None,
     ) -> dict[str, object]:
         """用一条 RE2 正则匹配知识片段。
 
@@ -459,6 +452,9 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         - pattern：一条 RE2 正则（不支持反向引用/前后瞻）。
         - queries：可选，用于缩小候选集的查询词。
         - limit：命中上限。
+        - grep_type：扫描范围，``dataset_ids``（默认）或 ``resource_ids``。
+        - resource_ids：限定扫描的文档/资源 id 列表；当 ``grep_type`` 为
+          ``resource_ids`` 时必填。
         """
 
         return grep_knowledge_chunks(
@@ -468,6 +464,8 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
             pattern=pattern,
             queries=queries,
             limit=limit,
+            grep_type=grep_type,
+            resource_ids=resource_ids,
         )
 
     @mcp.tool(name="list_document_infos")

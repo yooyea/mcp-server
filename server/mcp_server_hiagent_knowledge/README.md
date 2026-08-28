@@ -29,6 +29,8 @@ The HiAgent OpenAPI exposes the knowledge engine through a single `CallKnowledge
 
 > Note: in HiAgent a *dataset* is a *knowledge base*, so `list_datasets` / `get_dataset` are the "list/inspect knowledge base" capabilities (`list_knowledge_bases` additionally reports each base's `AvailableTools`).
 
+> Validation model: this server is a thin adapter. It only checks that the fields it must always send are present (workspace/dataset ids, a pattern/slug/queries where the capability requires one) and relies on argument types from the tool schema. Value ranges, enums and cross-field rules (e.g. `top_k`/`limit`/`overlap` bounds, `grep_type` scope rules) are owned by the OpenAPI (KBS) layer and are version-specific, so its `InvalidParameter.*` errors are passed through to the caller rather than duplicated here.
+
 ## Setup
 
 ### Prerequisites
@@ -166,9 +168,8 @@ Parameters:
 - `dataset_ids` (required): list of dataset ids to search, at least one.
 - `queries` (required): list of natural-language query strings, at least one.
 - `top_k` (optional): maximum number of results to return.
-- `score_threshold` (optional): minimum relevance score to keep (0~1).
+- `score_threshold` (optional): minimum relevance score to keep.
 - `rerank_id` (optional): rerank model id.
-- `knowledge_run_mode` (optional): run mode, one of `quick` / `smart_search` / `wiki_search`.
 
 #### grep_knowledge_chunks
 
@@ -190,6 +191,8 @@ Parameters:
 - `pattern` (required): one RE2 regular expression (no backreferences/lookarounds).
 - `queries` (optional): queries to narrow the candidate set.
 - `limit` (optional): maximum number of matches.
+- `grep_type` (optional): scan scope, `dataset_ids` (default) or `resource_ids`.
+- `resource_ids` (optional): document/resource ids to restrict the scan to; required when `grep_type` is `resource_ids`.
 
 #### list_document_infos
 

@@ -35,6 +35,8 @@ HiAgent OpenAPI 通过单个 `CallKnowledgeEngineTool` action 以「分发器」
 
 > 说明：HiAgent 中 dataset 即知识库，故 `list_datasets` / `get_dataset` 是「列/查知识库」能力（`list_knowledge_bases` 额外返回各库的 `AvailableTools`）。
 
+> 校验模型：本 Server 是薄适配层，只校验「必须发送的字段是否存在」（workspace/dataset ID、能力要求的 pattern/slug/queries 等）并依赖工具 schema 的参数类型；数值范围、枚举、跨字段规则（如 `top_k`/`limit`/`overlap` 的上下限、`grep_type` 的范围约束）由 OpenAPI（KBS）层负责且随版本变化，因此其 `InvalidParameter.*` 报错会原样透传给调用方，不在本层重复校验。
+
 ## 使用指南
 
 ### 前置准备
@@ -169,9 +171,8 @@ Parameters:
 - `dataset_ids` (必须): 要检索的知识库 ID 列表，至少 1 个
 - `queries` (必须): 检索查询词列表，至少 1 个
 - `top_k` (可选): 返回的最大结果数
-- `score_threshold` (可选): 保留结果的最小相关性分数（0~1）
+- `score_threshold` (可选): 保留结果的最小相关性分数
 - `rerank_id` (可选): 重排模型 ID
-- `knowledge_run_mode` (可选): 运行模式，枚举 `quick` / `smart_search` / `wiki_search`
 
 #### grep_knowledge_chunks
 
@@ -193,6 +194,8 @@ Parameters:
 - `pattern` (必须): 一条 RE2 正则（不支持反向引用/前后瞻）
 - `queries` (可选): 用于缩小候选集的查询词
 - `limit` (可选): 命中上限
+- `grep_type` (可选): 扫描范围，`dataset_ids`（默认）或 `resource_ids`
+- `resource_ids` (可选): 限定扫描的文档/资源 ID 列表；当 `grep_type` 为 `resource_ids` 时必填
 
 #### list_document_infos
 

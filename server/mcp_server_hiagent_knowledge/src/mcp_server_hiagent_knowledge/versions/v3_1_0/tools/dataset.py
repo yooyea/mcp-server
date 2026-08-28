@@ -13,7 +13,6 @@ from mcp_server_hiagent_knowledge.versions.v3_1_0.tools._common import (
     OPENAPI_SERVICE,
     OPENAPI_VERSION,
     OpenAPIClient,
-    validate_pagination,
 )
 
 
@@ -28,7 +27,6 @@ def list_datasets(
 
     if not workspace_id:
         raise ValueError("workspace_id is required")
-    validate_pagination(page_number, page_size)
     return client.call(
         action="ListDatasets",
         version=OPENAPI_VERSION,
