@@ -19,6 +19,13 @@ Capability tool  -> ToolName            -> parameter object
   search_wiki           -> wiki_search           -> WikiSearch
   read_wiki_page        -> wiki_read_page        -> WikiReadPage
   read_wiki_source      -> wiki_read_source_chunk -> WikiReadSourceChunk
+  read_wiki_source_doc  -> list_knowledge_chunks -> ListKnowledgeChunks
+
+Wiki source read-back mirrors the two runtime tools: ``read_wiki_source``
+resolves a Wiki page's referenced chunks by ``slug`` (wiki_read_source_chunk),
+while ``read_wiki_source_doc`` reads one referenced source document's chunks in
+order by ``resource_id`` (dispatched through list_knowledge_chunks, exactly as
+the runtime's wiki_read_source_doc tool does).
 
 Every sub-tool also accepts an optional ``user_info`` (the OpenAPI ``UserInfo``
 end-user identity, ``{"UserID": ..., "UserChannel": ...}``) forwarded verbatim.
@@ -340,12 +347,14 @@ def read_wiki_source(
     cursor_segment_id: str | None = None,
     user_info: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
-    """Read the original source chunks referenced by a Wiki page
+    """Read a Wiki page's referenced source chunks, resolved by page slug
     (CallKnowledgeEngineTool/wiki_read_source_chunk).
 
-    These chunks are the final evidence for facts/numbers/quotes. ``overlap``
-    expands each referenced chunk with adjacent segments for more context. Page
-    forward with ``cursor_segment_id``.
+    Reads the chunks a Wiki page references (its ``chunk_refs``) given the page
+    ``slug`` — the final evidence for facts/numbers/quotes. ``overlap`` expands
+    each referenced chunk with adjacent segments for more context. Page forward
+    with ``cursor_segment_id``. To instead read one referenced source document's
+    chunks in order by its resource id, use ``read_wiki_source_doc``.
     """
 
     if not slug:
@@ -366,6 +375,47 @@ def read_wiki_source(
         tool_name="wiki_read_source_chunk",
         parameter_field="WikiReadSourceChunk",
         parameter_object=src,
+        user_info=user_info,
+    )
+
+
+def read_wiki_source_doc(
+    client: OpenAPIClient,
+    *,
+    workspace_id: str,
+    dataset_ids: Sequence[str],
+    resource_id: str,
+    limit: int | None = None,
+    cursor_segment_id: str | None = None,
+    user_info: Mapping[str, object] | None = None,
+) -> dict[str, object]:
+    """Read one Wiki source document's chunks in order, by resource id
+    (dispatched through CallKnowledgeEngineTool/list_knowledge_chunks).
+
+    Companion to ``read_wiki_source``: where that resolves a page's referenced
+    chunks by ``slug``, this reads a single referenced source document
+    (``resource_id``, e.g. taken from a Wiki page's ``SourceRefs``) chunk by
+    chunk in reading order. Mirrors the runtime ``wiki_read_source_doc`` tool,
+    which likewise dispatches through ``list_knowledge_chunks`` and returns
+    ``ListKnowledgeChunks``. Page forward with ``cursor_segment_id``.
+    """
+
+    if not resource_id:
+        raise ValueError("resource_id is required")
+
+    chunks: dict[str, object] = {"ResourceID": resource_id}
+    if limit is not None:
+        chunks["Limit"] = limit
+    if cursor_segment_id:
+        chunks["CursorSegmentID"] = cursor_segment_id
+
+    return _call_knowledge_engine(
+        client,
+        workspace_id=workspace_id,
+        dataset_ids=dataset_ids,
+        tool_name="list_knowledge_chunks",
+        parameter_field="ListKnowledgeChunks",
+        parameter_object=chunks,
         user_info=user_info,
     )
 
@@ -580,9 +630,11 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         cursor_segment_id: str | None = None,
         user_info: dict[str, object] | None = None,
     ) -> dict[str, object]:
-        """读取某个 Wiki 页面引用的原始文档切片。
+        """按页面 slug 读取 Wiki 页引用的切片。
 
-        这些切片是事实、数字、引文与代码的最终证据。用 ``cursor_segment_id`` 续页。
+        读取 Wiki 页面引用的切片（其 chunk_refs），是事实、数字、引文与代码的
+        最终证据。用 ``cursor_segment_id`` 续页。若想按引用源文档的 resource_id
+        顺序读原文，改用 ``read_wiki_source_doc``。
 
         参数：
         - workspace_id：知识库所属的 workspace。
@@ -601,6 +653,39 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
             slug=slug,
             limit=limit,
             overlap=overlap,
+            cursor_segment_id=cursor_segment_id,
+            user_info=user_info,
+        )
+
+    @mcp.tool(name="read_wiki_source_doc")
+    def read_wiki_source_doc_tool(
+        workspace_id: str,
+        dataset_ids: list[str],
+        resource_id: str,
+        limit: int | None = None,
+        cursor_segment_id: str | None = None,
+        user_info: dict[str, object] | None = None,
+    ) -> dict[str, object]:
+        """按 resource_id 顺序读取某个被引用源文档的切片。
+
+        与 ``read_wiki_source`` 互补：后者按页面 slug 读引用切片；本工具顺序遍历
+        单个被引用源文档（``resource_id``，如取自 Wiki 页面的 SourceRefs）。
+
+        参数：
+        - workspace_id：知识库所属的 workspace。
+        - dataset_ids：资源所属的知识库 id 列表，至少 1 个。
+        - resource_id：要读取的被引用源文档/资源 id。
+        - limit：每页最大切片数。
+        - cursor_segment_id：续页游标。
+        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
+        """
+
+        return read_wiki_source_doc(
+            client,
+            workspace_id=workspace_id,
+            dataset_ids=dataset_ids,
+            resource_id=resource_id,
+            limit=limit,
             cursor_segment_id=cursor_segment_id,
             user_info=user_info,
         )

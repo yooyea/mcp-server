@@ -11,6 +11,7 @@ from mcp_server_hiagent_knowledge.versions.v3_1_0.tools.knowledge import (
     list_document_chunks,
     read_wiki_page,
     read_wiki_source,
+    read_wiki_source_doc,
     search_knowledge,
     search_wiki,
 )
@@ -348,6 +349,52 @@ def test_read_wiki_source_allows_zero_overlap() -> None:
 def test_read_wiki_source_required_fields(kwargs: dict[str, Any]) -> None:
     with pytest.raises(ValueError):
         read_wiki_source(RecordingClient(), **kwargs)
+
+
+# --- read_wiki_source_doc (dispatched via list_knowledge_chunks) ------------
+
+
+def test_read_wiki_source_doc_builds_request() -> None:
+    client = RecordingClient()
+    read_wiki_source_doc(
+        client,
+        workspace_id="ws-1",
+        dataset_ids=["ds-1"],
+        resource_id="res-1",
+        limit=5,
+        cursor_segment_id="seg-2",
+    )
+    assert client.calls[0]["body"] == {
+        "WorkspaceID": "ws-1",
+        "DatasetIDs": ["ds-1"],
+        "ToolName": "list_knowledge_chunks",
+        "ListKnowledgeChunks": {
+            "ResourceID": "res-1",
+            "Limit": 5,
+            "CursorSegmentID": "seg-2",
+        },
+    }
+
+
+def test_read_wiki_source_doc_omits_optional_fields() -> None:
+    client = RecordingClient()
+    read_wiki_source_doc(
+        client, workspace_id="ws-1", dataset_ids=["ds-1"], resource_id="res-1"
+    )
+    assert client.calls[0]["body"]["ListKnowledgeChunks"] == {"ResourceID": "res-1"}
+
+
+@pytest.mark.parametrize(
+    "kwargs",
+    [
+        {"workspace_id": "", "dataset_ids": ["ds-1"], "resource_id": "r"},
+        {"workspace_id": "ws-1", "dataset_ids": [], "resource_id": "r"},
+        {"workspace_id": "ws-1", "dataset_ids": ["ds-1"], "resource_id": ""},
+    ],
+)
+def test_read_wiki_source_doc_required_fields(kwargs: dict[str, Any]) -> None:
+    with pytest.raises(ValueError):
+        read_wiki_source_doc(RecordingClient(), **kwargs)
 
 
 # --- contract -----------------------------------------------------------------

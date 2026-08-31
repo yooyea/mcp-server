@@ -8,7 +8,7 @@ This MCP server exposes a **knowledge base (knowledge engine)** as MCP tools. Ea
 - Search knowledge across datasets by relevance (`search_knowledge`)
 - Match chunks by RE2 regex (`grep_knowledge_chunks`)
 - Read documents' metadata in batch (`list_document_infos`) and a document's chunks in order (`list_document_chunks`)
-- Search generated Wiki pages (`search_wiki`), read a page (`read_wiki_page`), and trace its original source chunks (`read_wiki_source`)
+- Search generated Wiki pages (`search_wiki`), read a page (`read_wiki_page`), and trace its sources — by page slug (`read_wiki_source`) or by a referenced source document's resource id (`read_wiki_source_doc`)
 - Report MCP server and OpenAPI configuration state
 
 ### Capability-based tool naming
@@ -23,7 +23,8 @@ The HiAgent OpenAPI exposes the knowledge engine through a single `CallKnowledge
 | `list_document_chunks` | `CallKnowledgeEngineTool` | `list_knowledge_chunks` | `ListKnowledgeChunks` | Sequential read of one document's chunks |
 | `search_wiki` | `CallKnowledgeEngineTool` | `wiki_search` | `WikiSearch` | Search generated Wiki pages |
 | `read_wiki_page` | `CallKnowledgeEngineTool` | `wiki_read_page` | `WikiReadPage` | Read a Wiki page by slug |
-| `read_wiki_source` | `CallKnowledgeEngineTool` | `wiki_read_source_chunk` | `WikiReadSourceChunk` | Read a Wiki page's original source chunks |
+| `read_wiki_source` | `CallKnowledgeEngineTool` | `wiki_read_source_chunk` | `WikiReadSourceChunk` | Read a Wiki page's referenced source chunks, by page slug |
+| `read_wiki_source_doc` | `CallKnowledgeEngineTool` | `list_knowledge_chunks` | `ListKnowledgeChunks` | Read one referenced source document's chunks in order, by resource id |
 
 > Note: in HiAgent a *dataset* is a *knowledge base*, so `list_datasets` / `get_dataset` are the "list/inspect knowledge base" capabilities. Every knowledge-engine tool also accepts an optional `user_info` (`{"UserID": ..., "UserChannel": ...}`) forwarded verbatim as the OpenAPI `UserInfo` end-user identity.
 
@@ -255,7 +256,7 @@ Parameters:
 
 #### read_wiki_source
 
-Read the original source chunks referenced by a Wiki page — the final evidence for facts, numbers, quotations and code.
+Read a Wiki page's referenced source chunks, resolved by the page slug — the final evidence for facts, numbers, quotations and code. To instead read one referenced source document's chunks in order by its resource id, use `read_wiki_source_doc`.
 
 ```python
 read_wiki_source(
@@ -273,6 +274,26 @@ Parameters:
 - `slug` (required): the Wiki page slug whose sources to read.
 - `limit` (optional): maximum number of source chunks per page.
 - `overlap` (optional): number of adjacent segments to expand around each referenced chunk for more context (0 disables expansion).
+- `cursor_segment_id` (optional): segment id to continue paging from.
+
+#### read_wiki_source_doc
+
+Read one referenced source document's chunks in reading order, by resource id. Companion to `read_wiki_source`: that resolves a page's referenced chunks by slug; this walks a single referenced source document (`resource_id`, e.g. from a Wiki page's `SourceRefs`) sequentially.
+
+```python
+read_wiki_source_doc(
+    workspace_id="workspace_id",
+    dataset_ids=["dataset_id"],
+    resource_id="resource_id",
+    limit=50,
+)
+```
+
+Parameters:
+- `workspace_id` (required): the workspace id the datasets belong to.
+- `dataset_ids` (required): dataset ids the resource belongs to, at least one.
+- `resource_id` (required): the referenced source document/resource whose chunks to read.
+- `limit` (optional): maximum number of chunks per page.
 - `cursor_segment_id` (optional): segment id to continue paging from.
 
 ## MCP Integration
