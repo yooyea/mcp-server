@@ -10,7 +10,7 @@ from mcp_server_hiagent_knowledge.versions.v3_1_0.tools.knowledge import (
     grep_knowledge_chunks,
     list_document_chunks,
     read_wiki_page,
-    read_wiki_source,
+    read_wiki_source_chunk,
     read_wiki_source_doc,
     search_knowledge,
     search_wiki,
@@ -295,12 +295,12 @@ def test_read_wiki_page_required_fields(kwargs: dict[str, Any]) -> None:
         read_wiki_page(RecordingClient(), **kwargs)
 
 
-# --- read_wiki_source (wiki_read_source_chunk) ------------------------------
+# --- read_wiki_source_chunk (wiki_read_source_chunk) ------------------------------
 
 
-def test_read_wiki_source_builds_oneof_request() -> None:
+def test_read_wiki_source_chunk_builds_oneof_request() -> None:
     client = RecordingClient()
-    read_wiki_source(
+    read_wiki_source_chunk(
         client,
         workspace_id="ws-1",
         dataset_ids=["ds-1"],
@@ -322,17 +322,17 @@ def test_read_wiki_source_builds_oneof_request() -> None:
     }
 
 
-def test_read_wiki_source_omits_optional_fields() -> None:
+def test_read_wiki_source_chunk_omits_optional_fields() -> None:
     client = RecordingClient()
-    read_wiki_source(
+    read_wiki_source_chunk(
         client, workspace_id="ws-1", dataset_ids=["ds-1"], slug="s"
     )
     assert client.calls[0]["body"]["WikiReadSourceChunk"] == {"Slug": "s"}
 
 
-def test_read_wiki_source_allows_zero_overlap() -> None:
+def test_read_wiki_source_chunk_allows_zero_overlap() -> None:
     client = RecordingClient()
-    read_wiki_source(
+    read_wiki_source_chunk(
         client, workspace_id="ws-1", dataset_ids=["ds-1"], slug="s", overlap=0
     )
     assert client.calls[0]["body"]["WikiReadSourceChunk"] == {"Slug": "s", "Overlap": 0}
@@ -346,9 +346,9 @@ def test_read_wiki_source_allows_zero_overlap() -> None:
         {"workspace_id": "ws-1", "dataset_ids": ["ds-1"], "slug": ""},
     ],
 )
-def test_read_wiki_source_required_fields(kwargs: dict[str, Any]) -> None:
+def test_read_wiki_source_chunk_required_fields(kwargs: dict[str, Any]) -> None:
     with pytest.raises(ValueError):
-        read_wiki_source(RecordingClient(), **kwargs)
+        read_wiki_source_chunk(RecordingClient(), **kwargs)
 
 
 # --- read_wiki_source_doc (dispatched via list_knowledge_chunks) ------------

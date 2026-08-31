@@ -8,7 +8,7 @@ This MCP server exposes a **knowledge base (knowledge engine)** as MCP tools. Ea
 - Search knowledge across datasets by relevance (`search_knowledge`)
 - Match chunks by RE2 regex (`grep_knowledge_chunks`)
 - Read documents' metadata in batch (`list_document_infos`) and a document's chunks in order (`list_document_chunks`)
-- Search generated Wiki pages (`search_wiki`), read a page (`read_wiki_page`), and trace its sources — by page slug (`read_wiki_source`) or by a referenced source document's resource id (`read_wiki_source_doc`)
+- Search generated Wiki pages (`search_wiki`), read a page (`read_wiki_page`), and trace its sources — by page slug (`read_wiki_source_chunk`) or by a referenced source document's resource id (`read_wiki_source_doc`)
 - Report MCP server and OpenAPI configuration state
 
 ### Capability-based tool naming
@@ -23,7 +23,7 @@ The HiAgent OpenAPI exposes the knowledge engine through a single `CallKnowledge
 | `list_document_chunks` | `CallKnowledgeEngineTool` | `list_knowledge_chunks` | `ListKnowledgeChunks` | Sequential read of one document's chunks |
 | `search_wiki` | `CallKnowledgeEngineTool` | `wiki_search` | `WikiSearch` | Search generated Wiki pages |
 | `read_wiki_page` | `CallKnowledgeEngineTool` | `wiki_read_page` | `WikiReadPage` | Read a Wiki page by slug |
-| `read_wiki_source` | `CallKnowledgeEngineTool` | `wiki_read_source_chunk` | `WikiReadSourceChunk` | Read a Wiki page's referenced source chunks, by page slug |
+| `read_wiki_source_chunk` | `CallKnowledgeEngineTool` | `wiki_read_source_chunk` | `WikiReadSourceChunk` | Read a Wiki page's referenced source chunks, by page slug |
 | `read_wiki_source_doc` | `CallKnowledgeEngineTool` | `list_knowledge_chunks` | `ListKnowledgeChunks` | Read one referenced source document's chunks in order, by resource id |
 
 > Note: in HiAgent a *dataset* is a *knowledge base*, so `list_datasets` / `get_dataset` are the "list/inspect knowledge base" capabilities. Every knowledge-engine tool also accepts an optional `user_info` (`{"UserID": ..., "UserChannel": ...}`) forwarded verbatim as the OpenAPI `UserInfo` end-user identity.
@@ -254,12 +254,12 @@ Parameters:
 - `dataset_ids` (required): dataset ids the page belongs to, at least one.
 - `slug` (required): the Wiki page slug (from `search_wiki`).
 
-#### read_wiki_source
+#### read_wiki_source_chunk
 
 Read a Wiki page's referenced source chunks, resolved by the page slug — the final evidence for facts, numbers, quotations and code. To instead read one referenced source document's chunks in order by its resource id, use `read_wiki_source_doc`.
 
 ```python
-read_wiki_source(
+read_wiki_source_chunk(
     workspace_id="workspace_id",
     dataset_ids=["dataset_id"],
     slug="concept/reverse-acquisition",
@@ -278,7 +278,7 @@ Parameters:
 
 #### read_wiki_source_doc
 
-Read one referenced source document's chunks in reading order, by resource id. Companion to `read_wiki_source`: that resolves a page's referenced chunks by slug; this walks a single referenced source document (`resource_id`, e.g. from a Wiki page's `SourceRefs`) sequentially.
+Read one referenced source document's chunks in reading order, by resource id. Companion to `read_wiki_source_chunk`: that resolves a page's referenced chunks by slug; this walks a single referenced source document (`resource_id`, e.g. from a Wiki page's `SourceRefs`) sequentially.
 
 ```python
 read_wiki_source_doc(

@@ -18,10 +18,10 @@ Capability tool  -> ToolName            -> parameter object
   list_document_chunks  -> list_knowledge_chunks -> ListKnowledgeChunks
   search_wiki           -> wiki_search           -> WikiSearch
   read_wiki_page        -> wiki_read_page        -> WikiReadPage
-  read_wiki_source      -> wiki_read_source_chunk -> WikiReadSourceChunk
+  read_wiki_source_chunk -> wiki_read_source_chunk -> WikiReadSourceChunk
   read_wiki_source_doc  -> list_knowledge_chunks -> ListKnowledgeChunks
 
-Wiki source read-back mirrors the two runtime tools: ``read_wiki_source``
+Wiki source read-back mirrors the two runtime tools: ``read_wiki_source_chunk``
 resolves a Wiki page's referenced chunks by ``slug`` (wiki_read_source_chunk),
 while ``read_wiki_source_doc`` reads one referenced source document's chunks in
 order by ``resource_id`` (dispatched through list_knowledge_chunks, exactly as
@@ -286,7 +286,7 @@ def search_wiki(
     """Search generated Wiki pages (CallKnowledgeEngineTool/wiki_search).
 
     Returns Wiki page candidates (with ``Slug``) for navigation, not final
-    evidence. Read a page with ``read_wiki_page`` / ``read_wiki_source``.
+    evidence. Read a page with ``read_wiki_page`` / ``read_wiki_source_chunk``.
     """
 
     if not queries:
@@ -319,7 +319,7 @@ def read_wiki_page(
     (CallKnowledgeEngineTool/wiki_read_page).
 
     Wiki pages are generated navigation material; read the original sources with
-    ``read_wiki_source`` before answering with facts.
+    ``read_wiki_source_chunk`` before answering with facts.
     """
 
     if not slug:
@@ -336,7 +336,7 @@ def read_wiki_page(
     )
 
 
-def read_wiki_source(
+def read_wiki_source_chunk(
     client: OpenAPIClient,
     *,
     workspace_id: str,
@@ -392,7 +392,7 @@ def read_wiki_source_doc(
     """Read one Wiki source document's chunks in order, by resource id
     (dispatched through CallKnowledgeEngineTool/list_knowledge_chunks).
 
-    Companion to ``read_wiki_source``: where that resolves a page's referenced
+    Companion to ``read_wiki_source_chunk``: where that resolves a page's referenced
     chunks by ``slug``, this reads a single referenced source document
     (``resource_id``, e.g. taken from a Wiki page's ``SourceRefs``) chunk by
     chunk in reading order. Mirrors the runtime ``wiki_read_source_doc`` tool,
@@ -574,7 +574,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         """搜索生成的 Wiki 页面，用于概念与主题页导航。
 
         返回 Wiki 页面候选（含 ``Slug``），用于导航而非最终证据。用
-        ``read_wiki_page`` 阅读页面，再用 ``read_wiki_source`` 溯源原文。
+        ``read_wiki_page`` 阅读页面，再用 ``read_wiki_source_chunk`` 溯源原文。
 
         参数：
         - workspace_id：知识库所属的 workspace。
@@ -603,7 +603,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         """按 slug 读取单个生成的 Wiki 页面（结构、摘要、内容）。
 
         Wiki 页面是生成的导航材料，非最终证据；在给出事实前先用
-        ``read_wiki_source`` 读取原始来源。
+        ``read_wiki_source_chunk`` 读取原始来源。
 
         参数：
         - workspace_id：知识库所属的 workspace。
@@ -620,8 +620,8 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
             user_info=user_info,
         )
 
-    @mcp.tool(name="read_wiki_source")
-    def read_wiki_source_tool(
+    @mcp.tool(name="read_wiki_source_chunk")
+    def read_wiki_source_chunk_tool(
         workspace_id: str,
         dataset_ids: list[str],
         slug: str,
@@ -646,7 +646,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
         """
 
-        return read_wiki_source(
+        return read_wiki_source_chunk(
             client,
             workspace_id=workspace_id,
             dataset_ids=dataset_ids,
@@ -668,7 +668,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
     ) -> dict[str, object]:
         """按 resource_id 顺序读取某个被引用源文档的切片。
 
-        与 ``read_wiki_source`` 互补：后者按页面 slug 读引用切片；本工具顺序遍历
+        与 ``read_wiki_source_chunk`` 互补：后者按页面 slug 读引用切片；本工具顺序遍历
         单个被引用源文档（``resource_id``，如取自 Wiki 页面的 SourceRefs）。
 
         参数：

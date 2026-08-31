@@ -30,7 +30,7 @@ def test_server_registers_knowledge_engine_tools() -> None:
         "list_document_chunks",
         "search_wiki",
         "read_wiki_page",
-        "read_wiki_source",
+        "read_wiki_source_chunk",
         "read_wiki_source_doc",
     }
 

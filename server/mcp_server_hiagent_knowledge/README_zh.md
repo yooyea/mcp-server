@@ -14,7 +14,7 @@ HiAgent Knowledge MCP Server 是一个模型上下文协议（Model Context Prot
 - 在一个或多个知识库中按相关性检索知识片段（`search_knowledge`）
 - 按 RE2 正则匹配切片（`grep_knowledge_chunks`）
 - 批量读取文档元数据（`list_document_infos`）与按顺序读取文档切片（`list_document_chunks`）
-- 搜索生成的 Wiki 页面（`search_wiki`）、读取 Wiki 页面（`read_wiki_page`），并溯源：按页面 slug 读引用切片（`read_wiki_source`）或按引用源文档的 resource_id 顺序读原文（`read_wiki_source_doc`）
+- 搜索生成的 Wiki 页面（`search_wiki`）、读取 Wiki 页面（`read_wiki_page`），并溯源：按页面 slug 读引用切片（`read_wiki_source_chunk`）或按引用源文档的 resource_id 顺序读原文（`read_wiki_source_doc`）
 - 查看 MCP Server 与 OpenAPI 的配置状态
 
 ### 面向能力的工具命名
@@ -29,7 +29,7 @@ HiAgent OpenAPI 通过单个 `CallKnowledgeEngineTool` action 以「分发器」
 | `list_document_chunks` | `CallKnowledgeEngineTool` | `list_knowledge_chunks` | `ListKnowledgeChunks` | 顺序读取单个文档的分片 |
 | `search_wiki` | `CallKnowledgeEngineTool` | `wiki_search` | `WikiSearch` | 搜索生成的 Wiki 页面 |
 | `read_wiki_page` | `CallKnowledgeEngineTool` | `wiki_read_page` | `WikiReadPage` | 按 slug 读取 Wiki 页面 |
-| `read_wiki_source` | `CallKnowledgeEngineTool` | `wiki_read_source_chunk` | `WikiReadSourceChunk` | 按页面 slug 读取 Wiki 引用的切片 |
+| `read_wiki_source_chunk` | `CallKnowledgeEngineTool` | `wiki_read_source_chunk` | `WikiReadSourceChunk` | 按页面 slug 读取 Wiki 引用的切片 |
 | `read_wiki_source_doc` | `CallKnowledgeEngineTool` | `list_knowledge_chunks` | `ListKnowledgeChunks` | 按 resource_id 顺序读取某引用源文档的切片 |
 
 > 说明：HiAgent 中 dataset 即知识库，故 `list_datasets` / `get_dataset` 是「列/查知识库」能力。每个知识引擎工具还接受可选的 `user_info`（`{"UserID": ..., "UserChannel": ...}`），原样透传为 OpenAPI 的 `UserInfo` 终端用户身份。
@@ -106,7 +106,7 @@ HiAgent Knowledge MCP Server 提供以下功能：
 - `list_document_chunks`: 按顺序列出单个文档/资源的知识分片
 - `search_wiki`: 搜索生成的 Wiki 页面
 - `read_wiki_page`: 按 slug 读取 Wiki 页面
-- `read_wiki_source`: 读取 Wiki 页引用的原始文档切片
+- `read_wiki_source_chunk`: 读取 Wiki 页引用的原始文档切片
 - `read_wiki_source_doc`: 按 resource_id 顺序读取某引用源文档的切片
 
 #### health_check
@@ -259,12 +259,12 @@ Parameters:
 - `dataset_ids` (必须): 页面所属的知识库 ID 列表，至少 1 个
 - `slug` (必须): Wiki 页面 slug（来自 `search_wiki`）
 
-#### read_wiki_source
+#### read_wiki_source_chunk
 
 按页面 slug 读取 Wiki 页引用的切片——事实、数字、引文、代码的最终证据来源。若想按引用源文档的 resource_id 顺序读原文，改用 `read_wiki_source_doc`。
 
 ```python
-read_wiki_source(
+read_wiki_source_chunk(
     workspace_id="workspace_id",
     dataset_ids=["dataset_id"],
     slug="concept/reverse-acquisition",
@@ -283,7 +283,7 @@ Parameters:
 
 #### read_wiki_source_doc
 
-按 resource_id 顺序读取某个被引用源文档的切片。与 `read_wiki_source` 互补：后者按页面 slug 读引用切片；本工具顺序遍历单个被引用源文档（`resource_id`，如取自 Wiki 页面的 `SourceRefs`）。
+按 resource_id 顺序读取某个被引用源文档的切片。与 `read_wiki_source_chunk` 互补：后者按页面 slug 读引用切片；本工具顺序遍历单个被引用源文档（`resource_id`，如取自 Wiki 页面的 `SourceRefs`）。
 
 ```python
 read_wiki_source_doc(
