@@ -24,7 +24,6 @@ def test_server_registers_knowledge_engine_tools() -> None:
         "health_check",
         "list_datasets",
         "get_dataset",
-        "list_knowledge_bases",
         "search_knowledge",
         "grep_knowledge_chunks",
         "list_document_infos",

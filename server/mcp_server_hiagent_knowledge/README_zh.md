@@ -11,7 +11,6 @@ HiAgent Knowledge MCP Server 是一个模型上下文协议（Model Context Prot
 ## 功能
 
 - 列出指定 workspace 下的知识库列表，并查看单个知识库详情
-- 查看某知识库支持的子工具（`list_knowledge_bases`，返回 `AvailableTools`）
 - 在一个或多个知识库中按相关性检索知识片段（`search_knowledge`）
 - 按 RE2 正则匹配切片（`grep_knowledge_chunks`）
 - 批量读取文档元数据（`list_document_infos`）与按顺序读取文档切片（`list_document_chunks`）
@@ -24,7 +23,6 @@ HiAgent OpenAPI 通过单个 `CallKnowledgeEngineTool` action 以「分发器」
 
 | MCP 工具 | OpenAPI action | `ToolName` | 参数对象 | 能力 |
 |---|---|---|---|---|
-| `list_knowledge_bases` | `CallKnowledgeEngineTool` | `list_knowledge_bases` | — | 列知识库及其 `AvailableTools` |
 | `search_knowledge` | `CallKnowledgeEngineTool` | `knowledge_search` | `KnowledgeSearch` | 跨知识库按相关性检索 |
 | `grep_knowledge_chunks` | `CallKnowledgeEngineTool` | `grep_chunks` | `GrepChunks` | 候选切片内 RE2 正则匹配 |
 | `list_document_infos` | `CallKnowledgeEngineTool` | `list_doc_infos` | `ListDocInfos` | 按知识库批量查文档元数据 |
@@ -33,7 +31,7 @@ HiAgent OpenAPI 通过单个 `CallKnowledgeEngineTool` action 以「分发器」
 | `read_wiki_page` | `CallKnowledgeEngineTool` | `wiki_read_page` | `WikiReadPage` | 按 slug 读取 Wiki 页面 |
 | `read_wiki_source` | `CallKnowledgeEngineTool` | `wiki_read_source_chunk` | `WikiReadSourceChunk` | 读取 Wiki 页引用的原始切片 |
 
-> 说明：HiAgent 中 dataset 即知识库，故 `list_datasets` / `get_dataset` 是「列/查知识库」能力（`list_knowledge_bases` 额外返回各库的 `AvailableTools`）。
+> 说明：HiAgent 中 dataset 即知识库，故 `list_datasets` / `get_dataset` 是「列/查知识库」能力。每个知识引擎工具还接受可选的 `user_info`（`{"UserID": ..., "UserChannel": ...}`），原样透传为 OpenAPI 的 `UserInfo` 终端用户身份。
 
 > 校验模型：本 Server 是薄适配层，只校验「必须发送的字段是否存在」（workspace/dataset ID、能力要求的 pattern/slug/queries 等）并依赖工具 schema 的参数类型；数值范围、枚举、跨字段规则（如 `top_k`/`limit`/`overlap` 的上下限、`grep_type` 的范围约束）由 OpenAPI（KBS）层负责且随版本变化，因此其 `InvalidParameter.*` 报错会原样透传给调用方，不在本层重复校验。
 
@@ -101,7 +99,6 @@ HiAgent Knowledge MCP Server 提供以下功能：
 - `health_check`: 返回 MCP server 与 OpenAPI 的配置状态
 - `list_datasets`: 列出指定 workspace 下的知识库列表
 - `get_dataset`: 获取单个知识库的详细信息
-- `list_knowledge_bases`: 列出知识库及其支持的子工具（`AvailableTools`）
 - `search_knowledge`: 在一个或多个知识库中按相关性检索知识片段
 - `grep_knowledge_chunks`: 按 RE2 正则匹配知识切片
 - `list_document_infos`: 按知识库批量获取文档元数据
@@ -143,16 +140,6 @@ get_dataset(
 Parameters:
 - `workspace_id` (必须): 知识库所属的 workspace ID
 - `dataset_id` (必须): 要获取信息的知识库 ID
-
-#### list_knowledge_bases
-
-```python
-list_knowledge_bases(workspace_id="workspace_id", dataset_ids=["dataset_id"])
-```
-
-Parameters:
-- `workspace_id` (必须): 知识库所属的 workspace ID
-- `dataset_ids` (必须): 要描述的知识库 ID 列表，至少 1 个
 
 #### search_knowledge
 

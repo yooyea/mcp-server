@@ -5,7 +5,6 @@ This MCP server exposes a **knowledge base (knowledge engine)** as MCP tools. Ea
 ## Features
 
 - List knowledge bases (datasets) in a workspace, and inspect a single dataset
-- Discover a knowledge base's supported sub-tools (`list_knowledge_bases`)
 - Search knowledge across datasets by relevance (`search_knowledge`)
 - Match chunks by RE2 regex (`grep_knowledge_chunks`)
 - Read documents' metadata in batch (`list_document_infos`) and a document's chunks in order (`list_document_chunks`)
@@ -18,7 +17,6 @@ The HiAgent OpenAPI exposes the knowledge engine through a single `CallKnowledge
 
 | MCP tool | OpenAPI action | `ToolName` | Parameter object | Capability |
 |---|---|---|---|---|
-| `list_knowledge_bases` | `CallKnowledgeEngineTool` | `list_knowledge_bases` | — | List KBs + their `AvailableTools` |
 | `search_knowledge` | `CallKnowledgeEngineTool` | `knowledge_search` | `KnowledgeSearch` | Relevance search across datasets |
 | `grep_knowledge_chunks` | `CallKnowledgeEngineTool` | `grep_chunks` | `GrepChunks` | RE2 regex match over candidate chunks |
 | `list_document_infos` | `CallKnowledgeEngineTool` | `list_doc_infos` | `ListDocInfos` | Documents' metadata, batched by dataset |
@@ -27,7 +25,7 @@ The HiAgent OpenAPI exposes the knowledge engine through a single `CallKnowledge
 | `read_wiki_page` | `CallKnowledgeEngineTool` | `wiki_read_page` | `WikiReadPage` | Read a Wiki page by slug |
 | `read_wiki_source` | `CallKnowledgeEngineTool` | `wiki_read_source_chunk` | `WikiReadSourceChunk` | Read a Wiki page's original source chunks |
 
-> Note: in HiAgent a *dataset* is a *knowledge base*, so `list_datasets` / `get_dataset` are the "list/inspect knowledge base" capabilities (`list_knowledge_bases` additionally reports each base's `AvailableTools`).
+> Note: in HiAgent a *dataset* is a *knowledge base*, so `list_datasets` / `get_dataset` are the "list/inspect knowledge base" capabilities. Every knowledge-engine tool also accepts an optional `user_info` (`{"UserID": ..., "UserChannel": ...}`) forwarded verbatim as the OpenAPI `UserInfo` end-user identity.
 
 > Validation model: this server is a thin adapter. It only checks that the fields it must always send are present (workspace/dataset ids, a pattern/slug/queries where the capability requires one) and relies on argument types from the tool schema. Value ranges, enums and cross-field rules (e.g. `top_k`/`limit`/`overlap` bounds, `grep_type` scope rules) are owned by the OpenAPI (KBS) layer and are version-specific, so its `InvalidParameter.*` errors are passed through to the caller rather than duplicated here.
 
@@ -136,18 +134,6 @@ get_dataset(
 Parameters:
 - `workspace_id` (required): the workspace id the dataset belongs to.
 - `dataset_id` (required): the id of the dataset to inspect.
-
-#### list_knowledge_bases
-
-List knowledge bases and the sub-tools each one supports (`AvailableTools`), plus its index types.
-
-```python
-list_knowledge_bases(workspace_id="workspace_id", dataset_ids=["dataset_id"])
-```
-
-Parameters:
-- `workspace_id` (required): the workspace id the datasets belong to.
-- `dataset_ids` (required): dataset ids to describe, at least one.
 
 #### search_knowledge
 

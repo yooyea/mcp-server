@@ -30,7 +30,7 @@ def create_mcp_server(client: OpenAPIClient | None = None) -> FastMCP:
             "HiAgent Knowledge MCP Server exposes a knowledge base (knowledge "
             "engine) as MCP tools. Each tool is named after the user-facing "
             "capability it provides. It offers knowledge base discovery "
-            "(list_datasets, get_dataset, list_knowledge_bases) and the full "
+            "(list_datasets, get_dataset) and the full "
             "knowledge-engine tool set (search_knowledge, grep_knowledge_chunks, "
             "list_document_infos, list_document_chunks, search_wiki, "
             "read_wiki_page, read_wiki_source). It supports stdio and "

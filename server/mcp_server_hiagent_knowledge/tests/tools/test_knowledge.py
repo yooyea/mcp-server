@@ -9,7 +9,6 @@ from mcp_server_hiagent_knowledge.versions.v3_1_0.tools.knowledge import (
     list_document_infos,
     grep_knowledge_chunks,
     list_document_chunks,
-    list_knowledge_bases,
     read_wiki_page,
     read_wiki_source,
     search_knowledge,
@@ -29,24 +28,6 @@ class RecordingClient:
 def _common(body: dict[str, Any]) -> None:
     """Every knowledge-engine call shares action/version/service."""
     assert body  # placeholder for readability
-
-
-# --- list_knowledge_bases ---------------------------------------------------
-
-
-def test_list_knowledge_bases_request() -> None:
-    client = RecordingClient()
-    list_knowledge_bases(client, workspace_id="ws-1", dataset_ids=["ds-1"])
-    assert client.calls[0] == {
-        "action": "CallKnowledgeEngineTool",
-        "version": "2023-08-01",
-        "service": "app",
-        "body": {
-            "WorkspaceID": "ws-1",
-            "DatasetIDs": ["ds-1"],
-            "ToolName": "list_knowledge_bases",
-        },
-    }
 
 
 # --- search_knowledge (knowledge_search) ------------------------------------
@@ -372,9 +353,8 @@ def test_read_wiki_source_required_fields(kwargs: dict[str, Any]) -> None:
 # --- contract -----------------------------------------------------------------
 
 
-def test_known_tool_names_cover_all_eight() -> None:
+def test_known_tool_names_cover_the_seven_sub_tools() -> None:
     assert set(KNOWN_TOOL_NAMES) == {
-        "list_knowledge_bases",
         "knowledge_search",
         "grep_chunks",
         "list_doc_infos",
@@ -383,6 +363,24 @@ def test_known_tool_names_cover_all_eight() -> None:
         "wiki_read_page",
         "wiki_read_source_chunk",
     }
+
+
+def test_user_info_passed_through() -> None:
+    client = RecordingClient()
+    search_knowledge(
+        client,
+        workspace_id="ws-1",
+        dataset_ids=["ds-1"],
+        queries=["q"],
+        user_info={"UserID": "u-1", "UserChannel": "web"},
+    )
+    assert client.calls[0]["body"]["UserInfo"] == {"UserID": "u-1", "UserChannel": "web"}
+
+
+def test_user_info_omitted_when_absent() -> None:
+    client = RecordingClient()
+    read_wiki_page(client, workspace_id="ws-1", dataset_ids=["ds-1"], slug="s")
+    assert "UserInfo" not in client.calls[0]["body"]
 
 
 def test_all_calls_use_action_version_service() -> None:

@@ -12,7 +12,6 @@ the oneof request body with field names kept strictly identical to the OpenAPI
 contract (verified against a live top server on 2026-08-20).
 
 Capability tool  -> ToolName            -> parameter object
-  list_knowledge_bases  -> list_knowledge_bases  (no argument object)
   search_knowledge      -> knowledge_search      -> KnowledgeSearch
   grep_knowledge_chunks -> grep_chunks           -> GrepChunks
   list_document_infos   -> list_doc_infos         -> ListDocInfos
@@ -20,6 +19,9 @@ Capability tool  -> ToolName            -> parameter object
   search_wiki           -> wiki_search           -> WikiSearch
   read_wiki_page        -> wiki_read_page        -> WikiReadPage
   read_wiki_source      -> wiki_read_source_chunk -> WikiReadSourceChunk
+
+Every sub-tool also accepts an optional ``user_info`` (the OpenAPI ``UserInfo``
+end-user identity, ``{"UserID": ..., "UserChannel": ...}``) forwarded verbatim.
 """
 
 from __future__ import annotations
@@ -38,10 +40,8 @@ from mcp_server_hiagent_knowledge.versions.v3_1_0.tools._common import (
 # The single OpenAPI action every knowledge-engine capability dispatches through.
 KNOWLEDGE_ENGINE_ACTION = "CallKnowledgeEngineTool"
 
-# All knowledge-engine sub-tools, keyed by the OpenAPI ``ToolName`` value. All
-# eight are implemented and verified against a live top server.
+# All knowledge-engine sub-tools, keyed by the OpenAPI ``ToolName`` value.
 KNOWN_TOOL_NAMES = (
-    "list_knowledge_bases",
     "knowledge_search",
     "grep_chunks",
     "list_doc_infos",
@@ -60,6 +60,7 @@ def _call_knowledge_engine(
     tool_name: str,
     parameter_field: str | None = None,
     parameter_object: dict[str, object] | None = None,
+    user_info: Mapping[str, object] | None = None,
     top: int | None = None,
 ) -> dict[str, object]:
     """Assemble and send a ``CallKnowledgeEngineTool`` oneof request.
@@ -67,7 +68,8 @@ def _call_knowledge_engine(
     Shared by every capability handler. ``parameter_object`` is placed under the
     PascalCase ``parameter_field`` (e.g. ``KnowledgeSearch``); callers pass the
     already-built object so field names stay strictly aligned with the OpenAPI
-    contract. ``list_knowledge_bases`` carries no parameter object.
+    contract. ``user_info`` is forwarded verbatim as the top-level ``UserInfo``
+    end-user identity when provided.
 
     Argument *values* are not validated here: field ranges, enums and
     cross-field rules are the OpenAPI (KBS) layer's responsibility and are
@@ -93,6 +95,8 @@ def _call_knowledge_engine(
     }
     if parameter_field is not None and parameter_object is not None:
         body[parameter_field] = parameter_object
+    if user_info:
+        body["UserInfo"] = dict(user_info)
     if top is not None:
         body["Top"] = top
 
@@ -106,28 +110,6 @@ def _call_knowledge_engine(
 
 # --- capability handlers ----------------------------------------------------
 
-
-def list_knowledge_bases(
-    client: OpenAPIClient,
-    *,
-    workspace_id: str,
-    dataset_ids: Sequence[str],
-) -> dict[str, object]:
-    """List knowledge bases and the sub-tools each one supports
-    (CallKnowledgeEngineTool/list_knowledge_bases).
-
-    Returns each base's ``DatasetID``, ``IndexTypes`` and ``AvailableTools`` so
-    callers can discover which capabilities a dataset supports.
-    """
-
-    return _call_knowledge_engine(
-        client,
-        workspace_id=workspace_id,
-        dataset_ids=dataset_ids,
-        tool_name="list_knowledge_bases",
-    )
-
-
 def search_knowledge(
     client: OpenAPIClient,
     *,
@@ -137,6 +119,7 @@ def search_knowledge(
     top_k: int | None = None,
     score_threshold: float | None = None,
     rerank_id: str | None = None,
+    user_info: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Semantic knowledge retrieval (CallKnowledgeEngineTool/knowledge_search)."""
 
@@ -158,6 +141,7 @@ def search_knowledge(
         tool_name="knowledge_search",
         parameter_field="KnowledgeSearch",
         parameter_object=search,
+        user_info=user_info,
     )
 
 
@@ -171,6 +155,7 @@ def grep_knowledge_chunks(
     limit: int | None = None,
     grep_type: str | None = None,
     resource_ids: Sequence[str] | None = None,
+    user_info: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Match knowledge chunks by RE2 regex (CallKnowledgeEngineTool/grep_chunks).
 
@@ -201,6 +186,7 @@ def grep_knowledge_chunks(
         tool_name="grep_chunks",
         parameter_field="GrepChunks",
         parameter_object=grep,
+        user_info=user_info,
     )
 
 
@@ -210,6 +196,7 @@ def list_document_infos(
     workspace_id: str,
     dataset_ids: Sequence[str],
     resource_ids: Mapping[str, Sequence[str]],
+    user_info: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Read metadata for documents, batched by dataset
     (CallKnowledgeEngineTool/list_doc_infos).
@@ -239,6 +226,7 @@ def list_document_infos(
         tool_name="list_doc_infos",
         parameter_field="ListDocInfos",
         parameter_object={"ResourceIDs": normalized},
+        user_info=user_info,
     )
 
 
@@ -250,6 +238,7 @@ def list_document_chunks(
     resource_id: str,
     limit: int | None = None,
     cursor_segment_id: str | None = None,
+    user_info: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """List one document's chunks in reading order
     (CallKnowledgeEngineTool/list_knowledge_chunks).
@@ -274,6 +263,7 @@ def list_document_chunks(
         tool_name="list_knowledge_chunks",
         parameter_field="ListKnowledgeChunks",
         parameter_object=chunks,
+        user_info=user_info,
     )
 
 
@@ -284,6 +274,7 @@ def search_wiki(
     dataset_ids: Sequence[str],
     queries: Sequence[str],
     limit: int | None = None,
+    user_info: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Search generated Wiki pages (CallKnowledgeEngineTool/wiki_search).
 
@@ -305,6 +296,7 @@ def search_wiki(
         tool_name="wiki_search",
         parameter_field="WikiSearch",
         parameter_object=wiki,
+        user_info=user_info,
     )
 
 
@@ -314,6 +306,7 @@ def read_wiki_page(
     workspace_id: str,
     dataset_ids: Sequence[str],
     slug: str,
+    user_info: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Read one generated Wiki page by slug
     (CallKnowledgeEngineTool/wiki_read_page).
@@ -332,6 +325,7 @@ def read_wiki_page(
         tool_name="wiki_read_page",
         parameter_field="WikiReadPage",
         parameter_object={"Slug": slug},
+        user_info=user_info,
     )
 
 
@@ -344,6 +338,7 @@ def read_wiki_source(
     limit: int | None = None,
     overlap: int | None = None,
     cursor_segment_id: str | None = None,
+    user_info: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Read the original source chunks referenced by a Wiki page
     (CallKnowledgeEngineTool/wiki_read_source_chunk).
@@ -371,6 +366,7 @@ def read_wiki_source(
         tool_name="wiki_read_source_chunk",
         parameter_field="WikiReadSourceChunk",
         parameter_object=src,
+        user_info=user_info,
     )
 
 
@@ -382,23 +378,6 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
     raw OpenAPI ``ToolName``.
     """
 
-    @mcp.tool(name="list_knowledge_bases")
-    def list_knowledge_bases_tool(
-        workspace_id: str,
-        dataset_ids: list[str],
-    ) -> dict[str, object]:
-        """列出知识库及各库支持的子工具。
-
-        返回每个库的索引类型与 ``AvailableTools``（该库支持
-        search_knowledge / grep_knowledge_chunks / list_document_infos /
-        list_document_chunks / search_wiki / read_wiki_page / read_wiki_source
-        中的哪些）。
-        """
-
-        return list_knowledge_bases(
-            client, workspace_id=workspace_id, dataset_ids=dataset_ids
-        )
-
     @mcp.tool(name="search_knowledge")
     def search_knowledge_tool(
         workspace_id: str,
@@ -407,10 +386,11 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         top_k: int | None = None,
         score_threshold: float | None = None,
         rerank_id: str | None = None,
+        user_info: dict[str, object] | None = None,
     ) -> dict[str, object]:
         """在一个或多个知识库中检索，返回最相关的知识片段。
 
-        用 ``list_datasets`` / ``list_knowledge_bases`` 获取知识库 id。
+        用 ``list_datasets`` 获取知识库 id。
 
         参数：
         - workspace_id：知识库所属的 workspace。
@@ -419,6 +399,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         - top_k：返回的最大片段数。
         - score_threshold：保留结果的最小相关性分数。
         - rerank_id：可选的重排模型 id。
+        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
         """
 
         return search_knowledge(
@@ -429,6 +410,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
             top_k=top_k,
             score_threshold=score_threshold,
             rerank_id=rerank_id,
+            user_info=user_info,
         )
 
     @mcp.tool(name="grep_knowledge_chunks")
@@ -440,6 +422,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         limit: int | None = None,
         grep_type: str | None = None,
         resource_ids: list[str] | None = None,
+        user_info: dict[str, object] | None = None,
     ) -> dict[str, object]:
         """用一条 RE2 正则匹配知识片段。
 
@@ -455,6 +438,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         - grep_type：扫描范围，``dataset_ids``（默认）或 ``resource_ids``。
         - resource_ids：限定扫描的文档/资源 id 列表；当 ``grep_type`` 为
           ``resource_ids`` 时必填。
+        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
         """
 
         return grep_knowledge_chunks(
@@ -466,6 +450,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
             limit=limit,
             grep_type=grep_type,
             resource_ids=resource_ids,
+            user_info=user_info,
         )
 
     @mcp.tool(name="list_document_infos")
@@ -473,6 +458,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         workspace_id: str,
         dataset_ids: list[str],
         resource_ids: dict[str, list[str]],
+        user_info: dict[str, object] | None = None,
     ) -> dict[str, object]:
         """按知识库批量获取一个或多个文档的元数据。
 
@@ -483,6 +469,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         - dataset_ids：涉及的知识库 id 列表，至少 1 个。
         - resource_ids：知识库 id -> 该库下文档/资源 id 列表 的映射；
           其 key 必须在 ``dataset_ids`` 内。
+        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
         """
 
         return list_document_infos(
@@ -490,6 +477,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
             workspace_id=workspace_id,
             dataset_ids=dataset_ids,
             resource_ids=resource_ids,
+            user_info=user_info,
         )
 
     @mcp.tool(name="list_document_chunks")
@@ -499,6 +487,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         resource_id: str,
         limit: int | None = None,
         cursor_segment_id: str | None = None,
+        user_info: dict[str, object] | None = None,
     ) -> dict[str, object]:
         """按阅读顺序列出单个文档的知识片段。
 
@@ -511,6 +500,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         - resource_id：要列出分片的文档/资源。
         - limit：每页最大片段数。
         - cursor_segment_id：续页游标。
+        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
         """
 
         return list_document_chunks(
@@ -520,6 +510,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
             resource_id=resource_id,
             limit=limit,
             cursor_segment_id=cursor_segment_id,
+            user_info=user_info,
         )
 
     @mcp.tool(name="search_wiki")
@@ -528,6 +519,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         dataset_ids: list[str],
         queries: list[str],
         limit: int | None = None,
+        user_info: dict[str, object] | None = None,
     ) -> dict[str, object]:
         """搜索生成的 Wiki 页面，用于概念与主题页导航。
 
@@ -539,6 +531,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         - dataset_ids：要检索的知识库 id 列表，至少 1 个。
         - queries：自然语言查询词，至少 1 条。
         - limit：返回页面上限。
+        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
         """
 
         return search_wiki(
@@ -547,6 +540,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
             dataset_ids=dataset_ids,
             queries=queries,
             limit=limit,
+            user_info=user_info,
         )
 
     @mcp.tool(name="read_wiki_page")
@@ -554,6 +548,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         workspace_id: str,
         dataset_ids: list[str],
         slug: str,
+        user_info: dict[str, object] | None = None,
     ) -> dict[str, object]:
         """按 slug 读取单个生成的 Wiki 页面（结构、摘要、内容）。
 
@@ -564,6 +559,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         - workspace_id：知识库所属的 workspace。
         - dataset_ids：页面所属的知识库 id 列表，至少 1 个。
         - slug：Wiki 页面 slug（来自 ``search_wiki``）。
+        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
         """
 
         return read_wiki_page(
@@ -571,6 +567,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
             workspace_id=workspace_id,
             dataset_ids=dataset_ids,
             slug=slug,
+            user_info=user_info,
         )
 
     @mcp.tool(name="read_wiki_source")
@@ -581,6 +578,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         limit: int | None = None,
         overlap: int | None = None,
         cursor_segment_id: str | None = None,
+        user_info: dict[str, object] | None = None,
     ) -> dict[str, object]:
         """读取某个 Wiki 页面引用的原始文档切片。
 
@@ -593,6 +591,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         - limit：每页最大源切片数。
         - overlap：每个引用切片前后各扩展的邻近分段数，用于补充上下文（0 表示不扩展）。
         - cursor_segment_id：续页游标。
+        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
         """
 
         return read_wiki_source(
@@ -603,4 +602,5 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
             limit=limit,
             overlap=overlap,
             cursor_segment_id=cursor_segment_id,
+            user_info=user_info,
         )
