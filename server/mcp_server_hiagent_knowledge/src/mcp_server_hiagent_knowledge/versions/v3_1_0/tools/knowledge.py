@@ -438,16 +438,18 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         rerank_id: str | None = None,
         user_info: dict[str, object] | None = None,
     ) -> dict[str, object]:
-        """在一个或多个知识库中检索，返回最相关的知识片段。
+        """语义检索：适合概念、解释、概览、改写类问题（"是什么"/"为什么"/"怎么做"/"总结"/"对比"），
+        即答案措辞可能与提问不同的场景。返回候选分段用于导航——把它们当作"在哪找"，
+        而非最终证据；回答事实前建议用 ``list_document_chunks`` 深读原文。
 
-        用 ``list_datasets`` 获取知识库 id。
+        用 ``list_datasets`` 获取知识库 id。常与 ``grep_knowledge_chunks``（精确锚定）配合以扩大召回。
 
         参数：
         - workspace_id：知识库所属的 workspace。
         - dataset_ids：要检索的知识库 id 列表，至少 1 个。
-        - queries：自然语言查询词，至少 1 条。
-        - top_k：返回的最大片段数。
-        - score_threshold：保留结果的最小相关性分数。
+        - queries：1~5 个简短、独立的自然语言问题或概念描述；不要传原始对话或长段落。
+        - top_k：返回的候选分段数；简单事实问题 5~10，跨文档分析/归因/对比建议 20~30。
+        - score_threshold：最低相关性分数（0~1）；想提高召回就设低，结果噪音多再调高。
         - rerank_id：可选的重排模型 id。
         - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
         """
@@ -474,20 +476,22 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         resource_ids: list[str] | None = None,
         user_info: dict[str, object] | None = None,
     ) -> dict[str, object]:
-        """用一条 RE2 正则匹配知识片段。
+        """用一条 RE2 正则定位精确文本——适合标识符、固定短语、字段/API 名、版本号、错误码等
+        对措辞敏感的场景。先缩小召回候选再套用正则，不保证穷举整个数据集。返回候选分段（在哪找），
+        不是最终证据；回答前建议用 ``list_document_chunks`` 深读原文。
 
-        用于语义检索不足时的精确 token 定位（错误码、函数名、标识符、固定短语）。
-        先召回候选再应用 ``pattern`` —— 不是对全库的穷尽扫描。
+        技巧：把近义/别名打包进 ONE 条并列正则 ``alias_a|alias_b|alias_c``，不要多次调用；
+        当 ``pattern`` 含正则运算符时，在 ``queries`` 里给不含运算符的可检索词以先召回候选。
+        常在 ``search_knowledge`` 之前用于实体锚定。
 
         参数：
         - workspace_id：知识库所属的 workspace。
         - dataset_ids：要检索的知识库 id 列表，至少 1 个。
-        - pattern：一条 RE2 正则（不支持反向引用/前后瞻）。
-        - queries：可选，用于缩小候选集的查询词。
-        - limit：命中上限。
+        - pattern：一条 RE2 正则（用 ``|`` 组合；不支持反向引用/前后瞻）。
+        - queries：可选，1~5 个字面检索词，套用正则前先召回候选分段。
+        - limit：返回的候选匹配数上限。
         - grep_type：扫描范围，``dataset_ids``（默认）或 ``resource_ids``。
-        - resource_ids：限定扫描的文档/资源 id 列表；当 ``grep_type`` 为
-          ``resource_ids`` 时必填。
+        - resource_ids：限定扫描的文档/资源 id 列表；当 ``grep_type`` 为 ``resource_ids`` 时必填。
         - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
         """
 
@@ -510,15 +514,14 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         resource_ids: dict[str, list[str]],
         user_info: dict[str, object] | None = None,
     ) -> dict[str, object]:
-        """按知识库批量获取一个或多个文档的元数据。
-
-        返回每个文档的标题、类型、大小、状态、分段数与时间戳。仅元数据，非文档内容。
+        """批量读取文档元数据（标题、类型、大小、状态、分段数、时间戳）。这是用于识别或对比文档的
+        "目录"，不能作为正文事实、规则、数字或引文的证据；要看正文请用 ``list_document_chunks`` 深读。
 
         参数：
         - workspace_id：知识库所属的 workspace。
         - dataset_ids：涉及的知识库 id 列表，至少 1 个。
-        - resource_ids：知识库 id -> 该库下文档/资源 id 列表 的映射；
-          其 key 必须在 ``dataset_ids`` 内。
+        - resource_ids：知识库 id -> 该库下文档/资源 id 列表 的映射（key 必须在 ``dataset_ids`` 内），
+          如 {"dataset-1": ["resource-1", "resource-2"]}；同一库的 id 合并为一次批量调用。
         - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
         """
 
@@ -539,17 +542,17 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         cursor_segment_id: str | None = None,
         user_info: dict[str, object] | None = None,
     ) -> dict[str, object]:
-        """按阅读顺序列出单个文档的知识片段。
-
-        与 ``search_knowledge``（按相关性排序）不同，本工具顺序遍历一个
-        ``resource_id``。用上一页返回的 segment id 作为 ``cursor_segment_id`` 续页。
+        """按阅读顺序深读单个文档的原始分段——当答案依赖完整上下文而非孤立片段时，
+        推荐在 ``search_knowledge`` / ``grep_knowledge_chunks`` 命中相关文档后用它接力深读。
+        搜索工具告诉你"在哪"，本工具告诉你"文档到底写了什么"。
 
         参数：
         - workspace_id：知识库所属的 workspace。
         - dataset_ids：资源所属的知识库 id 列表，至少 1 个。
-        - resource_id：要列出分片的文档/资源。
-        - limit：每页最大片段数。
-        - cursor_segment_id：续页游标。
+        - resource_id：要深读的文档/资源（来自前一步 search/grep 结果）。
+        - limit：每页最多读取的有序分段数。
+        - cursor_segment_id：续读游标；从头读时不要传。只能复用**同一文档**上一次调用返回的游标，
+          不要跨文档、跨工具串用游标。
         - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
         """
 
@@ -571,16 +574,16 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         limit: int | None = None,
         user_info: dict[str, object] | None = None,
     ) -> dict[str, object]:
-        """搜索生成的 Wiki 页面，用于概念与主题页导航。
-
-        返回 Wiki 页面候选（含 ``Slug``），用于导航而非最终证据。用
-        ``read_wiki_page`` 阅读页面，再用 ``read_wiki_source_chunk`` 溯源原文。
+        """用 BM25 关键词匹配找到入口 Wiki 页。返回页面候选（含 ``Slug``）仅用于
+        导航——结果是摘要，不是证据，不能只凭搜索结果作答；建议用
+        ``read_wiki_page`` 读取选中页面的正文。
 
         参数：
         - workspace_id：知识库所属的 workspace。
         - dataset_ids：要检索的知识库 id 列表，至少 1 个。
-        - queries：自然语言查询词，至少 1 条。
-        - limit：返回页面上限。
+        - queries：1~5 个简短关键词查询；保留有区分度的实体、产品名、缩写与精确
+          术语；别名或不同表述建议拆成不同查询。
+        - limit：返回的 Wiki 页面候选数上限。
         - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
         """
 
@@ -600,15 +603,19 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         slug: str,
         user_info: dict[str, object] | None = None,
     ) -> dict[str, object]:
-        """按 slug 读取单个生成的 Wiki 页面（结构、摘要、内容）。
+        """读取单个 Wiki 页面的完整内容——阅读 Wiki 材料的主力工具，适用于
+        ``search_wiki`` 找到的页面、从其他页面链接过来的页面，或特殊的
+        ``index`` 页（建议先读 ``index`` 获取知识库整体概览）。返回结果还会带出
+        相关页面（in/out 链接），可顺着链接跳 1~2 跳补充上下文。
 
-        Wiki 页面是生成的导航材料，非最终证据；在给出事实前先用
-        ``read_wiki_source_chunk`` 读取原始来源。
+        Wiki 页面是生成的导航材料，非最终证据；需要精确事实、数字、规则、引文或
+        代码时，建议用 ``read_wiki_source_chunk``（按本页 slug 溯源引用切片）或
+        ``read_wiki_source_doc``（按被引用源文档的 resource id 顺序读原文）回溯原始出处。
 
         参数：
         - workspace_id：知识库所属的 workspace。
         - dataset_ids：页面所属的知识库 id 列表，至少 1 个。
-        - slug：Wiki 页面 slug（来自 ``search_wiki``）。
+        - slug：Wiki 页面 slug（来自 ``search_wiki``、相关页面或 ``index``）。
         - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
         """
 
@@ -630,19 +637,19 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         cursor_segment_id: str | None = None,
         user_info: dict[str, object] | None = None,
     ) -> dict[str, object]:
-        """按页面 slug 读取 Wiki 页引用的切片。
-
-        读取 Wiki 页面引用的切片（其 chunk_refs），是事实、数字、引文与代码的
-        最终证据。用 ``cursor_segment_id`` 续页。若想按引用源文档的 resource_id
-        顺序读原文，改用 ``read_wiki_source_doc``。
+        """按页面 ``slug`` 解析、依 ``chunk_refs`` 顺序读取某个 Wiki 页面所引用的
+        源切片——获取该 Wiki 页面所依赖证据（事实、数字、引文、代码）的推荐方式。
+        设 ``overlap`` > 0 可在每个引用切片前后补充邻近上下文。若想按 resource id
+        顺序通读整篇被引用源文档，建议改用 ``read_wiki_source_doc``。
 
         参数：
         - workspace_id：知识库所属的 workspace。
         - dataset_ids：页面所属的知识库 id 列表，至少 1 个。
         - slug：要读取来源的 Wiki 页面 slug。
-        - limit：每页最大源切片数。
-        - overlap：每个引用切片前后各扩展的邻近分段数，用于补充上下文（0 表示不扩展）。
-        - cursor_segment_id：续页游标。
+        - limit：每页消费的引用锚点数上限（是锚点数，不是最终返回切片数）。
+        - overlap：每个锚点前后扩展的邻近分段数（0 表示仅锚点本身）。
+        - cursor_segment_id：续页游标；首次读取请省略。仅可复用同一页面上一次调用
+          返回的游标。
         - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
         """
 
@@ -666,17 +673,18 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         cursor_segment_id: str | None = None,
         user_info: dict[str, object] | None = None,
     ) -> dict[str, object]:
-        """按 resource_id 顺序读取某个被引用源文档的切片。
-
-        与 ``read_wiki_source_chunk`` 互补：后者按页面 slug 读引用切片；本工具顺序遍历
-        单个被引用源文档（``resource_id``，如取自 Wiki 页面的 SourceRefs）。
+        """按 resource id 顺序读取整篇被引用源文档的切片——当你想按原文顺序通读
+        （而非只读某页面所引用的切片）时，直接读取源文档的推荐方式，例如取 Wiki
+        页面 ``SourceRefs`` 中的某个 ``resource_id``。与 ``read_wiki_source_chunk``
+        互补（后者按页面 slug 解析引用切片）。
 
         参数：
         - workspace_id：知识库所属的 workspace。
         - dataset_ids：资源所属的知识库 id 列表，至少 1 个。
-        - resource_id：要读取的被引用源文档/资源 id。
-        - limit：每页最大切片数。
-        - cursor_segment_id：续页游标。
+        - resource_id：要读取的被引用源文档/资源 id（例如取自 Wiki 页面的 SourceRefs）。
+        - limit：每页顺序返回的切片数上限。
+        - cursor_segment_id：续页游标；首次读取请省略。仅可复用同一文档上一次调用
+          返回的游标。
         - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
         """
 
