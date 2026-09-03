@@ -1,4 +1,4 @@
-from typing import Any, Literal, Optional
+from typing import Any, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -20,7 +20,7 @@ class DocumentStatus(BaseModel):
     model_config = ConfigDict(extra="allow")
 
     process_status: Optional[int] = None
-    failed_code: Optional[str] = None
+    failed_code: Optional[Union[int, str]] = None
 
 
 class DocumentInfo(BaseModel):
@@ -38,6 +38,15 @@ class DocumentInfo(BaseModel):
     update_time: Optional[int] = None
     point_num: Optional[int] = None
     status: Optional[DocumentStatus] = None
+
+
+class ListDocumentsResult(BaseModel):
+    collection_name: str
+    total_num: Optional[int] = None
+    count: int
+    doc_list: list[DocumentInfo]
+    has_more: bool
+    next_token: Optional[str] = None
 
 
 class CollectionInfoResult(BaseModel):
