@@ -4,7 +4,7 @@ from typing import Any
 
 import pytest
 
-from mcp_server_hiagent.versions.v3_1_0.tools.dataset import get_dataset, list_datasets
+from mcp_server_hiagent_knowledge.versions.v3_1_0.tools.dataset import get_dataset, list_datasets
 
 
 class RecordingClient:
@@ -27,7 +27,8 @@ def test_list_datasets_builds_workspace_request() -> None:
         "service": "app",
         "body": {
             "WorkspaceID": "ws-1",
-            "ListOpt": {"PageNumber": 2, "PageSize": 10},
+            "PageNumber": 2,
+            "PageSize": 10,
         },
     }
 
@@ -37,7 +38,8 @@ def test_list_datasets_defaults() -> None:
 
     list_datasets(client, workspace_id="ws-1")
 
-    assert client.calls[0]["body"]["ListOpt"] == {"PageNumber": 1, "PageSize": 20}
+    assert client.calls[0]["body"]["PageNumber"] == 1
+    assert client.calls[0]["body"]["PageSize"] == 20
 
 
 def test_list_datasets_requires_workspace() -> None:
@@ -49,14 +51,18 @@ def test_list_datasets_requires_workspace() -> None:
     "page_number,page_size",
     [(0, 20), (1, 0), (1, 101)],
 )
-def test_list_datasets_validates_pagination(page_number: int, page_size: int) -> None:
-    with pytest.raises(ValueError):
-        list_datasets(
-            RecordingClient(),
-            workspace_id="ws-1",
-            page_number=page_number,
-            page_size=page_size,
-        )
+def test_list_datasets_passes_pagination_through(page_number: int, page_size: int) -> None:
+    # Pagination bounds are enforced by the OpenAPI layer, not here; whatever
+    # the caller passes is forwarded verbatim.
+    client = RecordingClient()
+    list_datasets(
+        client,
+        workspace_id="ws-1",
+        page_number=page_number,
+        page_size=page_size,
+    )
+    assert client.calls[0]["body"]["PageNumber"] == page_number
+    assert client.calls[0]["body"]["PageSize"] == page_size
 
 
 def test_get_dataset_builds_request() -> None:

@@ -8,11 +8,11 @@ import urllib.request
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from mcp_server_hiagent.versions.v3_1_0.config import HiAgentConfig
-from mcp_server_hiagent.versions.v3_1_0.signer import sign_openapi_request
-
-
-DEFAULT_OPENAPI_VERSION = "2023-08-01"
+from mcp_server_hiagent_knowledge.versions.v3_1_0.config import HiAgentConfig
+from mcp_server_hiagent_knowledge.versions.v3_1_0.signer import sign_openapi_request
+from mcp_server_hiagent_knowledge.versions.v3_1_0.tools._common import (
+    OPENAPI_VERSION as DEFAULT_OPENAPI_VERSION,
+)
 
 
 @dataclass(frozen=True)

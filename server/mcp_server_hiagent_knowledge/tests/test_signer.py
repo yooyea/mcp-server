@@ -4,7 +4,7 @@ import datetime as dt
 
 import pytest
 
-from mcp_server_hiagent.versions.v3_1_0.signer import sign_openapi_request
+from mcp_server_hiagent_knowledge.versions.v3_1_0.signer import sign_openapi_request
 
 
 def test_sign_openapi_request_includes_region_in_credential_scope() -> None:

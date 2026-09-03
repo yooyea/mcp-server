@@ -680,7 +680,7 @@ wheels = [
 ]
 
 [[package]]
-name = "mcp-server-hiagent"
+name = "mcp-server-hiagent-knowledge"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
