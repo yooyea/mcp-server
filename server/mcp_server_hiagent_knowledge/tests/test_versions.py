@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from mcp_server_hiagent.versions import (
+from mcp_server_hiagent_knowledge.versions import (
     DEFAULT_VERSION,
     SUPPORTED_VERSIONS,
     VERSION_PACKAGES,

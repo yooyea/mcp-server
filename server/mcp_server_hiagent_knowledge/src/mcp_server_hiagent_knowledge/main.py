@@ -6,7 +6,7 @@ import argparse
 import logging
 import os
 
-from mcp_server_hiagent.versions import (
+from mcp_server_hiagent_knowledge.versions import (
     DEFAULT_VERSION,
     SUPPORTED_VERSIONS,
     load_version_module,
@@ -79,7 +79,7 @@ def main() -> None:
         host=server_config.host,
         port=server_config.port,
         path=server_config.streamable_http_path,
-        stateless_http=os.getenv("STATELESS_HTTP", "true").lower() == "true",
+        stateless_http=server_config.stateless_http,
     )
 
 

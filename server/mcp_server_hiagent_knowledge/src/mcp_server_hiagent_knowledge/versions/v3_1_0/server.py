@@ -4,9 +4,9 @@ from __future__ import annotations
 
 from fastmcp import FastMCP
 
-from mcp_server_hiagent.versions.v3_1_0.client import HiAgentOpenAPIClient
-from mcp_server_hiagent.versions.v3_1_0.config import load_hiagent_config
-from mcp_server_hiagent.versions.v3_1_0.tools import (
+from mcp_server_hiagent_knowledge.versions.v3_1_0.client import HiAgentOpenAPIClient
+from mcp_server_hiagent_knowledge.versions.v3_1_0.config import load_hiagent_config
+from mcp_server_hiagent_knowledge.versions.v3_1_0.tools import (
     OpenAPIClient,
     register_dataset_tools,
     register_knowledge_tools,
@@ -14,7 +14,7 @@ from mcp_server_hiagent.versions.v3_1_0.tools import (
 
 
 def create_mcp_server(client: OpenAPIClient | None = None) -> FastMCP:
-    """Create the HiAgent MCP server.
+    """Create the HiAgent Knowledge MCP server.
 
     Credentials are loaded from environment variables at startup (single
     identity). Passing ``client`` injects a fixed OpenAPI client (used by
@@ -25,23 +25,27 @@ def create_mcp_server(client: OpenAPIClient | None = None) -> FastMCP:
     openapi_client = client or HiAgentOpenAPIClient(hiagent_config)
 
     mcp = FastMCP(
-        name="hiagent-mcp-server",
+        name="hiagent-knowledge-mcp-server",
         instructions=(
-            "HiAgent MCP Server wraps HiAgent Platform OpenAPI capabilities as "
-            "MCP tools. It currently provides knowledge-engine tools (dataset "
-            "listing and knowledge search) and will keep adding more HiAgent "
-            "OpenAPI capabilities. It supports stdio and streamable-http "
-            "transports and AK/SK authentication only. Credentials are provided "
-            "via environment variables (HIAGENT_TOP_HOST, HIAGENT_ACCESS_KEY_ID, "
-            "HIAGENT_SECRET_ACCESS_KEY)."
+            "HiAgent Knowledge MCP Server exposes a knowledge base (knowledge "
+            "engine) as MCP tools. Each tool is named after the user-facing "
+            "capability it provides. It offers knowledge base discovery "
+            "(list_datasets, get_dataset) and the full "
+            "knowledge-engine tool set (search_knowledge, grep_knowledge_chunks, "
+            "list_document_infos, list_document_chunks, search_wiki, "
+            "read_wiki_page, read_wiki_source_chunk, read_wiki_source_doc). "
+            "It supports stdio and "
+            "streamable-http transports and AK/SK authentication only. "
+            "Credentials are provided via environment variables "
+            "(HIAGENT_TOP_HOST, HIAGENT_ACCESS_KEY_ID, HIAGENT_SECRET_ACCESS_KEY)."
         ),
     )
 
     @mcp.tool()
     def health_check() -> dict[str, object]:
         """
-        Check whether the HiAgent MCP server is running and whether required
-        HiAgent OpenAPI configuration is present.
+        检查 HiAgent Knowledge MCP Server 是否运行、以及必需的知识库 OpenAPI 配置是否齐备。
+        仅返回状态与各项是否已配置的布尔值，不回显任何凭证明文。
         """
 
         return {

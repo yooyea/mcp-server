@@ -7,8 +7,8 @@ import urllib.request
 
 import pytest
 
-from mcp_server_hiagent.versions.v3_1_0.client import HiAgentOpenAPIClient, OpenAPIError
-from mcp_server_hiagent.versions.v3_1_0.config import HiAgentConfig
+from mcp_server_hiagent_knowledge.versions.v3_1_0.client import HiAgentOpenAPIClient, OpenAPIError
+from mcp_server_hiagent_knowledge.versions.v3_1_0.config import HiAgentConfig
 
 
 class _Response:

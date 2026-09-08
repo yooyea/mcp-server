@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from mcp_server_hiagent.versions.v3_1_0.config import (
+from mcp_server_hiagent_knowledge.versions.v3_1_0.config import (
     DEFAULT_ACCOUNT_ID,
     DEFAULT_REGION,
     load_hiagent_config,
@@ -46,4 +46,21 @@ def test_load_server_config_rejects_invalid_port(monkeypatch: pytest.MonkeyPatch
 
     with pytest.raises(ValueError, match="MCP_SERVER_PORT"):
         load_server_config()
+
+
+def test_load_server_config_stateless_http_defaults_true(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.delenv("STATELESS_HTTP", raising=False)
+
+    assert load_server_config().stateless_http is True
+
+
+def test_load_server_config_stateless_http_env_override(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("STATELESS_HTTP", "false")
+
+    assert load_server_config().stateless_http is False
+
 

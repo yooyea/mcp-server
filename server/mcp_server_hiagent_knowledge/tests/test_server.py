@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 from typing import Any
 
-from mcp_server_hiagent.versions.v3_1_0.server import create_mcp_server
+from mcp_server_hiagent_knowledge.versions.v3_1_0.server import create_mcp_server
 
 
 class RecordingClient:
@@ -22,9 +22,16 @@ def test_server_registers_knowledge_engine_tools() -> None:
 
     assert names == {
         "health_check",
-        "call_knowledge_engine_tool",
         "list_datasets",
         "get_dataset",
+        "search_knowledge",
+        "grep_knowledge_chunks",
+        "list_document_infos",
+        "list_document_chunks",
+        "search_wiki",
+        "read_wiki_page",
+        "read_wiki_source_chunk",
+        "read_wiki_source_doc",
     }
 
 

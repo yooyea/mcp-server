@@ -12,6 +12,7 @@ DEFAULT_ACCOUNT_ID = "1000000000"
 DEFAULT_HOST = "127.0.0.1"
 DEFAULT_PORT = 8000
 DEFAULT_STREAMABLE_HTTP_PATH = "/mcp"
+DEFAULT_STATELESS_HTTP = True
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,7 @@ class ServerConfig:
     host: str = DEFAULT_HOST
     port: int = DEFAULT_PORT
     streamable_http_path: str = DEFAULT_STREAMABLE_HTTP_PATH
+    stateless_http: bool = DEFAULT_STATELESS_HTTP
 
 
 def _clean_top_host(value: str) -> str:
@@ -79,5 +81,9 @@ def load_server_config() -> ServerConfig:
         streamable_http_path=(
             os.getenv("STREAMABLE_HTTP_PATH", DEFAULT_STREAMABLE_HTTP_PATH).strip()
             or DEFAULT_STREAMABLE_HTTP_PATH
+        ),
+        stateless_http=(
+            os.getenv("STATELESS_HTTP", str(DEFAULT_STATELESS_HTTP)).strip().lower()
+            == "true"
         ),
     )
