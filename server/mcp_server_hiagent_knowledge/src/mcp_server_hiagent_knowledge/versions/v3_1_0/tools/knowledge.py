@@ -28,6 +28,10 @@ list_knowledge_chunks).
 
 Every sub-tool also accepts an optional ``user_info`` (the OpenAPI ``UserInfo``
 end-user identity, ``{"UserID": ..., "UserChannel": ...}``) forwarded verbatim.
+The backend applies knowledge-base / document-level permission filtering to it
+only when ``UserChannel`` is ``"IAM"`` (or a ``"Lark"`` identity it can map to an
+IAM user) and ``UserID`` is a real user in the tenant; other channels are treated
+as guest. Pass it to make retrieval honor an end user's own access rights.
 """
 
 from __future__ import annotations
@@ -426,7 +430,9 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         - workspace_id：知识库所属的 workspace。
         - dataset_ids：要检索的知识库 id 列表，至少 1 个。
         - queries：1~5 个简短、独立的自然语言问题或概念描述；不要传原始对话或长段落。
-        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
+        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}，原样透传给后端。
+          仅当 UserChannel="IAM"（或可映射到 IAM 用户的 "Lark"）且 UserID 为租户内真实用户时，
+          后端才据此做知识库/文档级权限过滤；其它渠道按游客处理。用于让检索遵循终端用户自身的访问权限。
         """
 
         return search_knowledge(
@@ -464,7 +470,9 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         - limit：返回的候选匹配数上限。
         - grep_type：扫描范围，``dataset_ids``（默认）或 ``resource_ids``。
         - resource_ids：限定扫描的文档/资源 id 列表；当 ``grep_type`` 为 ``resource_ids`` 时必填。
-        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
+        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}，原样透传给后端。
+          仅当 UserChannel="IAM"（或可映射到 IAM 用户的 "Lark"）且 UserID 为租户内真实用户时，
+          后端才据此做知识库/文档级权限过滤；其它渠道按游客处理。用于让检索遵循终端用户自身的访问权限。
         """
 
         return grep_knowledge_chunks(
@@ -494,7 +502,9 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         - dataset_ids：涉及的知识库 id 列表，至少 1 个。
         - resource_ids：知识库 id -> 该库下文档/资源 id 列表 的映射（key 必须在 ``dataset_ids`` 内），
           如 {"dataset-1": ["resource-1", "resource-2"]}；同一库的 id 合并为一次批量调用。
-        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
+        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}，原样透传给后端。
+          仅当 UserChannel="IAM"（或可映射到 IAM 用户的 "Lark"）且 UserID 为租户内真实用户时，
+          后端才据此做知识库/文档级权限过滤；其它渠道按游客处理。用于让检索遵循终端用户自身的访问权限。
         """
 
         return list_document_infos(
@@ -525,7 +535,9 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         - limit：每页最多读取的有序分段数。
         - cursor_segment_id：续读游标；从头读时不要传。只能复用**同一文档**上一次调用返回的游标，
           不要跨文档、跨工具串用游标。
-        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
+        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}，原样透传给后端。
+          仅当 UserChannel="IAM"（或可映射到 IAM 用户的 "Lark"）且 UserID 为租户内真实用户时，
+          后端才据此做知识库/文档级权限过滤；其它渠道按游客处理。用于让检索遵循终端用户自身的访问权限。
         """
 
         return list_document_chunks(
@@ -556,7 +568,9 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         - queries：1~5 个简短关键词查询；保留有区分度的实体、产品名、缩写与精确
           术语；别名或不同表述建议拆成不同查询。
         - limit：返回的 Wiki 页面候选数上限。
-        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
+        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}，原样透传给后端。
+          仅当 UserChannel="IAM"（或可映射到 IAM 用户的 "Lark"）且 UserID 为租户内真实用户时，
+          后端才据此做知识库/文档级权限过滤；其它渠道按游客处理。用于让检索遵循终端用户自身的访问权限。
         """
 
         return search_wiki(
@@ -588,7 +602,9 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         - workspace_id：知识库所属的 workspace。
         - dataset_ids：页面所属的知识库 id 列表，至少 1 个。
         - slug：Wiki 页面 slug（来自 ``search_wiki``、相关页面或 ``index``）。
-        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
+        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}，原样透传给后端。
+          仅当 UserChannel="IAM"（或可映射到 IAM 用户的 "Lark"）且 UserID 为租户内真实用户时，
+          后端才据此做知识库/文档级权限过滤；其它渠道按游客处理。用于让检索遵循终端用户自身的访问权限。
         """
 
         return read_wiki_page(
@@ -622,7 +638,9 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         - overlap：每个锚点前后扩展的邻近分段数（0 表示仅锚点本身）。
         - cursor_segment_id：续页游标；首次读取请省略。仅可复用同一页面上一次调用
           返回的游标。
-        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
+        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}，原样透传给后端。
+          仅当 UserChannel="IAM"（或可映射到 IAM 用户的 "Lark"）且 UserID 为租户内真实用户时，
+          后端才据此做知识库/文档级权限过滤；其它渠道按游客处理。用于让检索遵循终端用户自身的访问权限。
         """
 
         return read_wiki_source_chunk(
@@ -657,7 +675,9 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         - limit：每页顺序返回的切片数上限。
         - cursor_segment_id：续页游标；首次读取请省略。仅可复用同一文档上一次调用
           返回的游标。
-        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
+        - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}，原样透传给后端。
+          仅当 UserChannel="IAM"（或可映射到 IAM 用户的 "Lark"）且 UserID 为租户内真实用户时，
+          后端才据此做知识库/文档级权限过滤；其它渠道按游客处理。用于让检索遵循终端用户自身的访问权限。
         """
 
         return read_wiki_source_doc(
