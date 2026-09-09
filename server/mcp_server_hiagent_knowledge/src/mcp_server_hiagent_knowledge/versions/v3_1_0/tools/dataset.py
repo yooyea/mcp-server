@@ -26,9 +26,11 @@ def list_datasets(
 ) -> dict[str, object]:
     """List datasets (knowledge bases) in a workspace.
 
-    When ``name`` is given, it is forwarded as the ``Filter.Name`` fuzzy search
-    (the backend matches it against dataset name/description); otherwise all
-    datasets are listed page by page.
+    When ``name`` is provided, it is forwarded as the ``Filter.Name`` fuzzy search
+    (the backend matches it against dataset name/description); when omitted
+    (``None``) no filter is sent and all datasets are listed page by page. Like
+    the pagination args, the value is passed through verbatim — an empty string
+    is forwarded as ``Filter.Name`` and left for the backend to interpret.
     """
 
     if not workspace_id:
@@ -38,7 +40,7 @@ def list_datasets(
         "PageNumber": page_number,
         "PageSize": page_size,
     }
-    if name:
+    if name is not None:
         body["Filter"] = {"Name": name}
     return client.call(
         action="ListDatasets",

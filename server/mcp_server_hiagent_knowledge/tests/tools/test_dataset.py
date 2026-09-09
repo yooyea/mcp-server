@@ -58,6 +58,16 @@ def test_list_datasets_name_builds_fuzzy_filter() -> None:
     assert client.calls[0]["body"]["Filter"] == {"Name": "finance"}
 
 
+def test_list_datasets_empty_name_still_builds_filter() -> None:
+    # Only ``None`` omits the filter; an explicit empty string is passed through
+    # verbatim (consistent with the pagination args), leaving it to the backend.
+    client = RecordingClient()
+
+    list_datasets(client, workspace_id="ws-1", name="")
+
+    assert client.calls[0]["body"]["Filter"] == {"Name": ""}
+
+
 def test_list_datasets_requires_workspace() -> None:
     with pytest.raises(ValueError):
         list_datasets(RecordingClient(), workspace_id="")
