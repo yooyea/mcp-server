@@ -28,7 +28,7 @@ The HiAgent OpenAPI exposes the knowledge engine through a single `CallKnowledge
 
 > Note: in HiAgent a *dataset* is a *knowledge base*, so `list_datasets` / `get_dataset` are the "list/inspect knowledge base" capabilities. Every knowledge-engine tool also accepts an optional `user_info` (`{"UserID": ..., "UserChannel": ...}`) forwarded verbatim as the OpenAPI `UserInfo` end-user identity.
 
-> Validation model: this server is a thin adapter. It only checks that the fields it must always send are present (workspace/dataset ids, a pattern/slug/queries where the capability requires one) and relies on argument types from the tool schema. Value ranges, enums and cross-field rules (e.g. `top_k`/`limit`/`overlap` bounds, `grep_type` scope rules) are owned by the backend service and are version-specific, so its `InvalidParameter.*` errors are passed through to the caller rather than duplicated here.
+> Validation model: this server is a thin adapter. It only checks that the fields it must always send are present (workspace/dataset ids, a pattern/slug/queries where the capability requires one) and relies on argument types from the tool schema. Value ranges, enums and cross-field rules (e.g. `limit`/`overlap` bounds, `grep_type` scope rules) are owned by the backend service and are version-specific, so its `InvalidParameter.*` errors are passed through to the caller rather than duplicated here.
 
 ## Setup
 
@@ -145,8 +145,6 @@ search_knowledge(
     workspace_id="workspace_id",
     dataset_ids=["dataset_id"],
     queries=["How to reset my password?"],
-    top_k=3,
-    score_threshold=0.2,
 )
 ```
 
@@ -154,9 +152,6 @@ Parameters:
 - `workspace_id` (required): the workspace id the datasets belong to.
 - `dataset_ids` (required): list of dataset ids to search, at least one.
 - `queries` (required): list of natural-language query strings, at least one.
-- `top_k` (optional): maximum number of results to return.
-- `score_threshold` (optional): minimum relevance score to keep.
-- `rerank_id` (optional): rerank model id.
 
 #### grep_knowledge_chunks
 

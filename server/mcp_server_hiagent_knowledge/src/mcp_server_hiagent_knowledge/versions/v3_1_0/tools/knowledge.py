@@ -119,9 +119,6 @@ def search_knowledge(
     workspace_id: str,
     dataset_ids: Sequence[str],
     queries: Sequence[str],
-    top_k: int | None = None,
-    score_threshold: float | None = None,
-    rerank_id: str | None = None,
     user_info: Mapping[str, object] | None = None,
 ) -> dict[str, object]:
     """Semantic knowledge retrieval (CallKnowledgeEngineTool/knowledge_search)."""
@@ -130,12 +127,6 @@ def search_knowledge(
         raise ValueError("queries must contain at least one query")
 
     search: dict[str, object] = {"Queries": list(queries)}
-    if top_k is not None:
-        search["TopK"] = top_k
-    if score_threshold is not None:
-        search["ScoreThreshold"] = score_threshold
-    if rerank_id:
-        search["RerankID"] = rerank_id
 
     return _call_knowledge_engine(
         client,
@@ -423,9 +414,6 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         workspace_id: str,
         dataset_ids: list[str],
         queries: list[str],
-        top_k: int | None = None,
-        score_threshold: float | None = None,
-        rerank_id: str | None = None,
         user_info: dict[str, object] | None = None,
     ) -> dict[str, object]:
         """语义检索：适合概念、解释、概览、改写类问题（"是什么"/"为什么"/"怎么做"/"总结"/"对比"），
@@ -438,9 +426,6 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         - workspace_id：知识库所属的 workspace。
         - dataset_ids：要检索的知识库 id 列表，至少 1 个。
         - queries：1~5 个简短、独立的自然语言问题或概念描述；不要传原始对话或长段落。
-        - top_k：返回的候选分段数；简单事实问题 5~10，跨文档分析/归因/对比建议 20~30。
-        - score_threshold：最低相关性分数（0~1）；想提高召回就设低，结果噪音多再调高。
-        - rerank_id：可选的重排模型 id。
         - user_info：可选的终端用户身份，{"UserID": ..., "UserChannel": ...}。
         """
 
@@ -449,9 +434,6 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
             workspace_id=workspace_id,
             dataset_ids=dataset_ids,
             queries=queries,
-            top_k=top_k,
-            score_threshold=score_threshold,
-            rerank_id=rerank_id,
             user_info=user_info,
         )
 

@@ -36,9 +36,6 @@ def test_search_knowledge_builds_oneof_request() -> None:
         workspace_id="ws-1",
         dataset_ids=["ds-1", "ds-2"],
         queries=["hello"],
-        top_k=3,
-        score_threshold=0.2,
-        rerank_id="rk-1",
     )
     assert client.calls[0]["body"] == {
         "WorkspaceID": "ws-1",
@@ -46,9 +43,6 @@ def test_search_knowledge_builds_oneof_request() -> None:
         "ToolName": "knowledge_search",
         "KnowledgeSearch": {
             "Queries": ["hello"],
-            "TopK": 3,
-            "ScoreThreshold": 0.2,
-            "RerankID": "rk-1",
         },
     }
 
@@ -71,20 +65,6 @@ def test_search_knowledge_omits_optional_fields() -> None:
 def test_search_knowledge_required_fields(kwargs: dict[str, Any]) -> None:
     with pytest.raises(ValueError):
         search_knowledge(RecordingClient(), **kwargs)
-
-
-def test_search_knowledge_passes_score_threshold_through() -> None:
-    # Value ranges are validated by the OpenAPI layer, not here: any value the
-    # caller provides is forwarded verbatim.
-    client = RecordingClient()
-    search_knowledge(
-        client,
-        workspace_id="ws-1",
-        dataset_ids=["ds-1"],
-        queries=["q"],
-        score_threshold=1.5,
-    )
-    assert client.calls[0]["body"]["KnowledgeSearch"]["ScoreThreshold"] == 1.5
 
 
 # --- grep_knowledge_chunks (grep_chunks) ------------------------------------

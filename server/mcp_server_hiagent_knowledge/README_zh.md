@@ -34,7 +34,7 @@ HiAgent OpenAPI 通过单个 `CallKnowledgeEngineTool` action 暴露知识引擎
 
 > 说明：HiAgent 中 dataset 即知识库，故 `list_datasets` / `get_dataset` 是「列/查知识库」能力。每个知识引擎工具还接受可选的 `user_info`（`{"UserID": ..., "UserChannel": ...}`），原样透传为 OpenAPI 的 `UserInfo` 终端用户身份。
 
-> 校验模型：本 Server 是薄适配层，只校验「必须发送的字段是否存在」（workspace/dataset ID、能力要求的 pattern/slug/queries 等）并依赖工具 schema 的参数类型；数值范围、枚举、跨字段规则（如 `top_k`/`limit`/`overlap` 的上下限、`grep_type` 的范围约束）由后端服务负责且随版本变化，因此其 `InvalidParameter.*` 报错会原样透传给调用方，不在本层重复校验。
+> 校验模型：本 Server 是薄适配层，只校验「必须发送的字段是否存在」（workspace/dataset ID、能力要求的 pattern/slug/queries 等）并依赖工具 schema 的参数类型；数值范围、枚举、跨字段规则（如 `limit`/`overlap` 的上下限、`grep_type` 的范围约束）由后端服务负责且随版本变化，因此其 `InvalidParameter.*` 报错会原样透传给调用方，不在本层重复校验。
 
 ## 使用指南
 
@@ -150,8 +150,6 @@ search_knowledge(
     workspace_id="workspace_id",
     dataset_ids=["dataset_id"],
     queries=["如何重置密码？"],
-    top_k=3,
-    score_threshold=0.2,
 )
 ```
 
@@ -159,9 +157,6 @@ Parameters:
 - `workspace_id` (必须): 知识库所属的 workspace ID
 - `dataset_ids` (必须): 要检索的知识库 ID 列表，至少 1 个
 - `queries` (必须): 检索查询词列表，至少 1 个
-- `top_k` (可选): 返回的最大结果数
-- `score_threshold` (可选): 保留结果的最小相关性分数
-- `rerank_id` (可选): 重排模型 ID
 
 #### grep_knowledge_chunks
 
