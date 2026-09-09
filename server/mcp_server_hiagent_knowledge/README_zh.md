@@ -120,6 +120,7 @@ health_check()
 ```python
 list_datasets(
     workspace_id="workspace_id",
+    name="财报",
     page_number=1,
     page_size=20,
 )
@@ -127,6 +128,7 @@ list_datasets(
 
 Parameters:
 - `workspace_id` (必须): 要列出知识库的 workspace ID
+- `name` (可选): 按名称模糊搜索的关键词（后端对知识库名称/描述做模糊匹配）；不传则列出全部
 - `page_number` (可选): 页码（默认值：1）
 - `page_size` (可选): 每页数量（默认值：20）
 

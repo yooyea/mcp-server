@@ -106,11 +106,12 @@ health_check()
 
 #### list_datasets
 
-List knowledge bases (datasets) in a workspace, so callers can obtain the `DatasetIDs` required by the knowledge engine.
+List knowledge bases (datasets) in a workspace, so callers can obtain the `DatasetIDs` required by the knowledge engine. Pass `name` to fuzzy-search knowledge bases by name.
 
 ```python
 list_datasets(
     workspace_id="workspace_id",
+    name="finance",
     page_number=1,
     page_size=20,
 )
@@ -118,6 +119,7 @@ list_datasets(
 
 Parameters:
 - `workspace_id` (required): the workspace id to list datasets for.
+- `name` (optional): name substring for fuzzy search; the backend matches it against dataset name/description. Omit to list all datasets.
 - `page_number` (optional): page number (default: 1).
 - `page_size` (optional): page size (default: 20).
 

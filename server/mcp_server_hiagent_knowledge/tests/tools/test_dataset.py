@@ -42,6 +42,22 @@ def test_list_datasets_defaults() -> None:
     assert client.calls[0]["body"]["PageSize"] == 20
 
 
+def test_list_datasets_without_name_omits_filter() -> None:
+    client = RecordingClient()
+
+    list_datasets(client, workspace_id="ws-1")
+
+    assert "Filter" not in client.calls[0]["body"]
+
+
+def test_list_datasets_name_builds_fuzzy_filter() -> None:
+    client = RecordingClient()
+
+    list_datasets(client, workspace_id="ws-1", name="finance")
+
+    assert client.calls[0]["body"]["Filter"] == {"Name": "finance"}
+
+
 def test_list_datasets_requires_workspace() -> None:
     with pytest.raises(ValueError):
         list_datasets(RecordingClient(), workspace_id="")

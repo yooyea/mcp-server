@@ -20,22 +20,31 @@ def list_datasets(
     client: OpenAPIClient,
     *,
     workspace_id: str,
+    name: str | None = None,
     page_number: int = 1,
     page_size: int = 20,
 ) -> dict[str, object]:
-    """List datasets (knowledge bases) in a workspace."""
+    """List datasets (knowledge bases) in a workspace.
+
+    When ``name`` is given, it is forwarded as the ``Filter.Name`` fuzzy search
+    (the backend matches it against dataset name/description); otherwise all
+    datasets are listed page by page.
+    """
 
     if not workspace_id:
         raise ValueError("workspace_id is required")
+    body: dict[str, object] = {
+        "WorkspaceID": workspace_id,
+        "PageNumber": page_number,
+        "PageSize": page_size,
+    }
+    if name:
+        body["Filter"] = {"Name": name}
     return client.call(
         action="ListDatasets",
         version=OPENAPI_VERSION,
         service=OPENAPI_SERVICE,
-        body={
-            "WorkspaceID": workspace_id,
-            "PageNumber": page_number,
-            "PageSize": page_size,
-        },
+        body=body,
     )
 
 
@@ -65,14 +74,25 @@ def register_dataset_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
     @mcp.tool(name="list_datasets")
     def list_datasets_tool(
         workspace_id: str,
+        name: str | None = None,
         page_number: int = 1,
         page_size: int = 20,
     ) -> dict[str, object]:
-        """列出某个 workspace 下的 HiAgent 知识库（dataset），供调用方获取知识引擎所需的 DatasetIDs。"""
+        """列出某个 workspace 下的 HiAgent 知识库（dataset），供调用方获取知识引擎所需的 DatasetIDs。
+
+        传入 ``name`` 可按名称模糊搜索知识库（后端对知识库名称/描述做模糊匹配）；不传则分页列出全部。
+
+        参数：
+        - workspace_id：要列出知识库的 workspace。
+        - name：可选，按名称模糊搜索的关键词。
+        - page_number：页码（默认 1）。
+        - page_size：每页数量（默认 20）。
+        """
 
         return list_datasets(
             client,
             workspace_id=workspace_id,
+            name=name,
             page_number=page_number,
             page_size=page_size,
         )
