@@ -29,7 +29,7 @@ class RecordingClient:
 # --- search_knowledge (knowledge_search) ------------------------------------
 
 
-def test_search_knowledge_builds_oneof_request() -> None:
+def test_search_knowledge_builds_request() -> None:
     client = RecordingClient()
     search_knowledge(
         client,
