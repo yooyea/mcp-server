@@ -63,6 +63,8 @@ The server requires the following environment variables:
 Optional environment variables:
 
 - `HIAGENT_VERSION`: HiAgent OpenAPI compatibility version to use. Defaults to the latest registered version (currently `v3.1.0`). Can also be set per-run with the `--hiagent-version` CLI flag, which takes precedence. Selects a self-contained implementation under `versions/`; supported values: `v3.1.0`
+- `HIAGENT_TOOLS`: Tool allowlist, a comma-separated list of exact tool names selecting the base tool set to expose; unset means all tools. Can also be set per-run with the `--tools` / `-t` CLI flag, which takes precedence
+- `HIAGENT_DISABLED_TOOLS`: Tool denylist, comma-separated; subtracted from the allowlist (or from all tools when no allowlist is given). Can also be set per-run with the `--disabled-tools` CLI flag, which takes precedence
 - `HIAGENT_ACCOUNT_ID`: Main account id sent as the `X-Account-Id` query parameter, defaults to `1000000000`
 - `HIAGENT_REGION`: Region used in AK/SK V4 signing (not a network address), defaults to `cn-north-1`
 - `FASTMCP_CHECK_FOR_UPDATES`: Set to `off` to skip FastMCP's startup update check, which otherwise makes an outbound request and can fail startup in restricted networks
@@ -92,6 +94,28 @@ registered version):
 
 ```bash
 python -m mcp_server_hiagent_knowledge.main --hiagent-version v3.1.0
+```
+
+### Filtering the Exposed Tools
+
+All tools are exposed by default. Two optional flags narrow the exposed tool set;
+both take a comma-separated list of **exact tool names** (an unknown name exits
+with an error), and `health_check` is always kept:
+
+| Flag | Short | Environment variable | Description |
+|---|---|---|---|
+| `--tools` | `-t` | `HIAGENT_TOOLS` | Allowlist: selects the base tool set; unset means all tools |
+| `--disabled-tools` | - | `HIAGENT_DISABLED_TOOLS` | Denylist: subtracted from the allowlist (or from all tools when no allowlist is given) |
+
+Resolution order: `--tools` picks the base set (unset = all), then
+`--disabled-tools` is subtracted from it. For each flag the precedence is
+**CLI flag > environment variable > unset**. For example, to make the agent
+reliably search the Wiki when a dataset mixes plain documents and generated Wiki
+pages, expose only the Wiki tools:
+
+```bash
+python -m mcp_server_hiagent_knowledge.main \
+  -t search_wiki,read_wiki_page,read_wiki_source_chunk,read_wiki_source_doc
 ```
 
 ### Available Tools

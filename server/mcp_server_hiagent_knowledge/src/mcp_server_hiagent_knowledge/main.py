@@ -12,7 +12,6 @@ from mcp_server_hiagent_knowledge.versions import (
     load_version_module,
 )
 
-
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -26,11 +25,24 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Run the HiAgent MCP Server")
     parser.add_argument(
         "--transport",
-        "-t",
         choices=["stdio", "streamable-http"],
         default="stdio",
         help="Transport protocol. 'stdio' (default) for local plugin hosts "
         "(e.g. HiAgent STDIO); 'streamable-http' for a long-running HTTP server.",
+    )
+    parser.add_argument(
+        "--tools",
+        "-t",
+        help="Comma-separated allowlist of tool names to expose (e.g. "
+        "'search_wiki,read_wiki_page'). Selects the base tool set; when omitted, "
+        "all tools are exposed. Overrides the HIAGENT_TOOLS environment variable. "
+        "'health_check' is always available.",
+    )
+    parser.add_argument(
+        "--disabled-tools",
+        help="Comma-separated denylist of tool names to hide. Subtracted from the "
+        "--tools allowlist (or from all tools when --tools is omitted). Overrides "
+        "the HIAGENT_DISABLED_TOOLS environment variable.",
     )
     parser.add_argument(
         "--hiagent-version",
@@ -60,7 +72,27 @@ def main() -> None:
     impl = load_version_module(version)
     logger.info("Using HiAgent version %s", version)
 
-    mcp = impl.create_mcp_server()
+    # Resolve the tool-scope filters. Precedence for each: CLI flag > environment
+    # variable > unset (all tools). ``parse_tool_list`` returns ``None`` when
+    # neither is provided, which the server treats as "no restriction".
+    enabled_tools = impl.parse_tool_list(
+        args.tools if args.tools is not None else os.getenv("HIAGENT_TOOLS")
+    )
+    disabled_tools = impl.parse_tool_list(
+        args.disabled_tools
+        if args.disabled_tools is not None
+        else os.getenv("HIAGENT_DISABLED_TOOLS")
+    )
+
+    try:
+        mcp = impl.create_mcp_server(
+            enabled_tools=enabled_tools,
+            disabled_tools=disabled_tools,
+        )
+    except ValueError as exc:
+        # Unknown tool name in --tools / --disabled-tools: fail fast with a clear
+        # CLI error instead of a traceback.
+        parser.error(str(exc))
 
     if args.transport == "stdio":
         logger.info("Starting HiAgent MCP Server with stdio transport")

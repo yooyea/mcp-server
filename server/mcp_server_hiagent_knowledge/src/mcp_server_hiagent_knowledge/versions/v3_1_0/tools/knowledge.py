@@ -46,9 +46,22 @@ from mcp_server_hiagent_knowledge.versions.v3_1_0.tools._common import (
     OpenAPIClient,
 )
 
-
 # The single OpenAPI action every knowledge-engine capability dispatches through.
 KNOWLEDGE_ENGINE_ACTION = "CallKnowledgeEngineTool"
+
+# MCP tool names registered by ``register_knowledge_tools`` (single source of
+# truth for tool-scope filtering). Distinct from ``KNOWN_TOOL_NAMES`` below,
+# which are the raw OpenAPI ``ToolName`` values these capabilities dispatch to.
+KNOWLEDGE_TOOL_NAMES = (
+    "search_knowledge",
+    "grep_knowledge_chunks",
+    "list_document_infos",
+    "list_document_chunks",
+    "search_wiki",
+    "read_wiki_page",
+    "read_wiki_source_chunk",
+    "read_wiki_source_doc",
+)
 
 # All knowledge-engine sub-tools, keyed by the OpenAPI ``ToolName`` value.
 KNOWN_TOOL_NAMES = (

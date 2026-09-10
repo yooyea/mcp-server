@@ -15,6 +15,10 @@ from mcp_server_hiagent_knowledge.versions.v3_1_0.tools._common import (
     OpenAPIClient,
 )
 
+# Tool names registered by ``register_dataset_tools`` (single source of truth for
+# tool-scope filtering).
+DATASET_TOOL_NAMES = ("list_datasets", "get_dataset")
+
 
 def list_datasets(
     client: OpenAPIClient,

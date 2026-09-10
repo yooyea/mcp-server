@@ -63,11 +63,29 @@ cd mcp-server/server/mcp_server_hiagent_knowledge
 uv run mcp-server-hiagent-knowledge
 
 # 使用 streamable-http 模式启动（默认为 stdio）
-uv run mcp-server-hiagent-knowledge -t streamable-http
+uv run mcp-server-hiagent-knowledge --transport streamable-http
 
 # 显式指定 HiAgent OpenAPI 版本（覆盖 HIAGENT_VERSION 环境变量；不填默认用最新）
 uv run mcp-server-hiagent-knowledge --hiagent-version v3.1.0
+
+# 只暴露部分工具（白名单，逗号分隔，-t 是 --tools 的简写）——
+# 例如只保留 Wiki 相关工具，让模型稳定走 Wiki 检索
+uv run mcp-server-hiagent-knowledge -t search_wiki,read_wiki_page,read_wiki_source_chunk,read_wiki_source_doc
+
+# 屏蔽个别工具（黑名单，在白名单基础上再剔除；不给白名单时相当于从全部工具中剔除）
+uv run mcp-server-hiagent-knowledge --disabled-tools grep_knowledge_chunks
 ```
+
+#### 工具范围过滤
+
+默认暴露全部工具。可用两个可选参数收窄暴露的工具集（都接受逗号分隔的**精确工具名**，未知名会直接报错退出；`health_check` 始终保留）：
+
+| 参数 | 简写 | 环境变量 | 说明 |
+|---|---|---|---|
+| `--tools` | `-t` | `HIAGENT_TOOLS` | 白名单：选定基础工具集；不填表示全部工具 |
+| `--disabled-tools` | - | `HIAGENT_DISABLED_TOOLS` | 黑名单：在白名单（或全部工具）基础上再剔除 |
+
+生效顺序：先由 `--tools` 选出基础集（不填=全部），再用 `--disabled-tools` 从中剔除。每个参数的取值优先级为**命令行参数 > 同名环境变量 > 不设置**。典型用法：知识库里同时挂了普通文档与生成的 Wiki，若希望模型稳定检索 Wiki，用 `-t` 只暴露 `search_wiki` / `read_wiki_page` / `read_wiki_source_chunk` / `read_wiki_source_doc` 即可。
 
 使用客户端与服务器交互：
 
@@ -88,6 +106,8 @@ Trae | Cursor | Claude Desktop | Cline | HiAgent MCP 插件 | ...
 | `HIAGENT_SECRET_ACCESS_KEY` | HiAgent 账号 SecretAccessKey | - |
 | `HIAGENT_ACCOUNT_ID` | 作为 `X-Account-Id` 查询参数发送的主账号 ID | `1000000000` |
 | `HIAGENT_VERSION` | 使用的 HiAgent OpenAPI 兼容版本，对应 `versions/` 下的自包含实现；不填默认使用最新已注册版本（当前为 `v3.1.0`）。也可用 `--hiagent-version` 命令行参数按次指定，且优先级更高；当前支持 `v3.1.0` | 最新（`v3.1.0`） |
+| `HIAGENT_TOOLS` | 工具白名单，逗号分隔的精确工具名；选定暴露的基础工具集，不填表示全部。可用 `--tools`/`-t` 命令行参数按次指定，优先级更高 | - |
+| `HIAGENT_DISABLED_TOOLS` | 工具黑名单，逗号分隔；在白名单（或全部工具）基础上再剔除。可用 `--disabled-tools` 命令行参数按次指定，优先级更高 | - |
 | `HIAGENT_REGION` | 用于 AK/SK V4 签名的 Region（非网络地址） | `cn-north-1` |
 | `FASTMCP_CHECK_FOR_UPDATES` | 设为 `off`，否则 FastMCP 启动时的联网版本检查在受限网络下可能导致启动失败 | - |
 | `MCP_SERVER_HOST` | MCP server 绑定 host（streamable-http） | `127.0.0.1` |
