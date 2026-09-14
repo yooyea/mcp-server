@@ -18,10 +18,11 @@ def test_parse_tool_list_splits_and_trims() -> None:
     assert parse_tool_list(" a, b ,c") == ["a", "b", "c"]
 
 
-def test_parse_tool_list_drops_blank_entries() -> None:
-    # An explicit empty / all-blank value yields an empty selection, not None.
-    assert parse_tool_list("") == []
-    assert parse_tool_list(" , ,") == []
+def test_parse_tool_list_blank_value_is_none() -> None:
+    # An empty / all-blank value (e.g. HIAGENT_TOOLS=) carries no tool names, so
+    # it maps to None ("no restriction" = all tools), not an empty selection.
+    assert parse_tool_list("") is None
+    assert parse_tool_list(" , ,") is None
 
 
 def test_resolve_none_allowlist_keeps_all() -> None:

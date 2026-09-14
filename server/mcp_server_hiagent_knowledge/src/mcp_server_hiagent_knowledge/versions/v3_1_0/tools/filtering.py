@@ -21,15 +21,19 @@ from collections.abc import Iterable, Sequence
 def parse_tool_list(raw: str | None) -> list[str] | None:
     """Parse a comma-separated tool list from a CLI value / environment variable.
 
-    Returns ``None`` when unset (argument omitted / empty), so the caller can tell
-    "not provided" apart from an explicit empty selection. Surrounding whitespace
-    is trimmed and blank entries are dropped.
+    Returns ``None`` when the value carries no tool names — argument omitted, or a
+    string that is empty / whitespace / only separators (e.g. ``HIAGENT_TOOLS=``).
+    This maps "no meaningful value" to "no restriction" (all tools), matching the
+    documented "unset = all tools" behaviour and avoiding an empty environment
+    variable silently narrowing the tool set. Surrounding whitespace is trimmed
+    and blank entries are dropped.
     """
 
     if raw is None:
         return None
     names = [name.strip() for name in raw.split(",")]
-    return [name for name in names if name]
+    names = [name for name in names if name]
+    return names or None
 
 
 def resolve_enabled_tools(

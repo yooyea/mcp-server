@@ -109,7 +109,9 @@ with an error), and `health_check` is always kept:
 
 Resolution order: `--tools` picks the base set (unset = all), then
 `--disabled-tools` is subtracted from it. For each flag the precedence is
-**CLI flag > environment variable > unset**. For example, to make the agent
+**CLI flag > environment variable > unset**; an empty or whitespace-only
+environment value (e.g. `HIAGENT_TOOLS=`) is treated as unset (= all tools) and
+does not narrow the set to just `health_check`. For example, to make the agent
 reliably search the Wiki when a dataset mixes plain documents and generated Wiki
 pages, expose only the Wiki tools:
 

@@ -73,6 +73,18 @@ def test_env_vars_used_when_flags_absent(
     assert captured["disabled_tools"] == ["read_wiki_page"]
 
 
+def test_empty_env_var_means_all_tools(
+    monkeypatch: pytest.MonkeyPatch, captured: dict[str, Any]
+) -> None:
+    # An empty HIAGENT_TOOLS= (visually indistinguishable from unset) must not
+    # narrow the tool set to just health_check; it maps to None (all tools).
+    monkeypatch.setenv("HIAGENT_TOOLS", "")
+    monkeypatch.setenv("HIAGENT_DISABLED_TOOLS", "  ")
+    _run(monkeypatch, [])
+    assert captured["enabled_tools"] is None
+    assert captured["disabled_tools"] is None
+
+
 def test_cli_flag_overrides_env(
     monkeypatch: pytest.MonkeyPatch, captured: dict[str, Any]
 ) -> None:

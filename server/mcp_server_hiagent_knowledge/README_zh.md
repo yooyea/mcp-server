@@ -85,7 +85,7 @@ uv run mcp-server-hiagent-knowledge --disabled-tools grep_knowledge_chunks
 | `--tools` | `-t` | `HIAGENT_TOOLS` | 白名单：选定基础工具集；不填表示全部工具 |
 | `--disabled-tools` | - | `HIAGENT_DISABLED_TOOLS` | 黑名单：在白名单（或全部工具）基础上再剔除 |
 
-生效顺序：先由 `--tools` 选出基础集（不填=全部），再用 `--disabled-tools` 从中剔除。每个参数的取值优先级为**命令行参数 > 同名环境变量 > 不设置**。典型用法：知识库里同时挂了普通文档与生成的 Wiki，若希望模型稳定检索 Wiki，用 `-t` 只暴露 `search_wiki` / `read_wiki_page` / `read_wiki_source_chunk` / `read_wiki_source_doc` 即可。
+生效顺序：先由 `--tools` 选出基础集（不填=全部），再用 `--disabled-tools` 从中剔除。每个参数的取值优先级为**命令行参数 > 同名环境变量 > 不设置**；环境变量取空值或纯空白（如 `HIAGENT_TOOLS=`）等同于不设置（=全部工具），不会把工具收窄到只剩 `health_check`。典型用法：知识库里同时挂了普通文档与生成的 Wiki，若希望模型稳定检索 Wiki，用 `-t` 只暴露 `search_wiki` / `read_wiki_page` / `read_wiki_source_chunk` / `read_wiki_source_doc` 即可。
 
 使用客户端与服务器交互：
 
