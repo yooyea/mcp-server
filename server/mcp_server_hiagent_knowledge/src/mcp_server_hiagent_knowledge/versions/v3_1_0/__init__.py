@@ -10,5 +10,6 @@ from __future__ import annotations
 
 from mcp_server_hiagent_knowledge.versions.v3_1_0.config import load_server_config
 from mcp_server_hiagent_knowledge.versions.v3_1_0.server import create_mcp_server
+from mcp_server_hiagent_knowledge.versions.v3_1_0.tools import parse_tool_list
 
-__all__ = ["create_mcp_server", "load_server_config"]
+__all__ = ["create_mcp_server", "load_server_config", "parse_tool_list"]

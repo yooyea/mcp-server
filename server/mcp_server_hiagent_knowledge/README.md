@@ -26,9 +26,9 @@ The HiAgent OpenAPI exposes the knowledge engine through a single `CallKnowledge
 | `read_wiki_source_chunk` | `CallKnowledgeEngineTool` | `wiki_read_source_chunk` | `WikiReadSourceChunk` | Read a Wiki page's referenced source chunks, by page slug |
 | `read_wiki_source_doc` | `CallKnowledgeEngineTool` | `list_knowledge_chunks` | `ListKnowledgeChunks` | Read one referenced source document's chunks in order, by resource id |
 
-> Note: in HiAgent a *dataset* is a *knowledge base*, so `list_datasets` / `get_dataset` are the "list/inspect knowledge base" capabilities. Every knowledge-engine tool also accepts an optional `user_info` (`{"UserID": ..., "UserChannel": ...}`) forwarded verbatim as the OpenAPI `UserInfo` end-user identity.
+> Note: in HiAgent a *dataset* is a *knowledge base*, so `list_datasets` / `get_dataset` are the "list/inspect knowledge base" capabilities. Every knowledge-engine tool also accepts an optional `user_info` (`{"UserID": ..., "UserChannel": ...}`) forwarded verbatim as the OpenAPI `UserInfo` end-user identity. The backend applies knowledge-base / document-level permission filtering to it only when `UserChannel` is `"IAM"` (or a `"Lark"` identity it can map to an IAM user) and `UserID` is a real user in the tenant; other channels are treated as guest. Pass it to make retrieval honor an end user's own access rights.
 
-> Validation model: this server is a thin adapter. It only checks that the fields it must always send are present (workspace/dataset ids, a pattern/slug/queries where the capability requires one) and relies on argument types from the tool schema. Value ranges, enums and cross-field rules (e.g. `top_k`/`limit`/`overlap` bounds, `grep_type` scope rules) are owned by the backend service and are version-specific, so its `InvalidParameter.*` errors are passed through to the caller rather than duplicated here.
+> Validation model: this server is a thin adapter. It only checks that the fields it must always send are present (workspace/dataset ids, a pattern/slug/queries where the capability requires one) and relies on argument types from the tool schema. Value ranges, enums and cross-field rules (e.g. `limit`/`overlap` bounds, `grep_type` scope rules) are owned by the backend service and are version-specific, so its `InvalidParameter.*` errors are passed through to the caller rather than duplicated here.
 
 ## Setup
 
@@ -63,6 +63,8 @@ The server requires the following environment variables:
 Optional environment variables:
 
 - `HIAGENT_VERSION`: HiAgent OpenAPI compatibility version to use. Defaults to the latest registered version (currently `v3.1.0`). Can also be set per-run with the `--hiagent-version` CLI flag, which takes precedence. Selects a self-contained implementation under `versions/`; supported values: `v3.1.0`
+- `HIAGENT_TOOLS`: Tool allowlist, a comma-separated list of exact tool names selecting the base tool set to expose; unset means all tools. Can also be set per-run with the `--tools` / `-t` CLI flag, which takes precedence
+- `HIAGENT_DISABLED_TOOLS`: Tool denylist, comma-separated; subtracted from the allowlist (or from all tools when no allowlist is given). Can also be set per-run with the `--disabled-tools` CLI flag, which takes precedence
 - `HIAGENT_ACCOUNT_ID`: Main account id sent as the `X-Account-Id` query parameter, defaults to `1000000000`
 - `HIAGENT_REGION`: Region used in AK/SK V4 signing (not a network address), defaults to `cn-north-1`
 - `FASTMCP_CHECK_FOR_UPDATES`: Set to `off` to skip FastMCP's startup update check, which otherwise makes an outbound request and can fail startup in restricted networks
@@ -94,6 +96,30 @@ registered version):
 python -m mcp_server_hiagent_knowledge.main --hiagent-version v3.1.0
 ```
 
+### Filtering the Exposed Tools
+
+All tools are exposed by default. Two optional flags narrow the exposed tool set;
+both take a comma-separated list of **exact tool names** (an unknown name exits
+with an error), and `health_check` is always kept:
+
+| Flag | Short | Environment variable | Description |
+|---|---|---|---|
+| `--tools` | `-t` | `HIAGENT_TOOLS` | Allowlist: selects the base tool set; unset means all tools |
+| `--disabled-tools` | - | `HIAGENT_DISABLED_TOOLS` | Denylist: subtracted from the allowlist (or from all tools when no allowlist is given) |
+
+Resolution order: `--tools` picks the base set (unset = all), then
+`--disabled-tools` is subtracted from it. For each flag the precedence is
+**CLI flag > environment variable > unset**; an empty or whitespace-only
+environment value (e.g. `HIAGENT_TOOLS=`) is treated as unset (= all tools) and
+does not narrow the set to just `health_check`. For example, to make the agent
+reliably search the Wiki when a dataset mixes plain documents and generated Wiki
+pages, expose only the Wiki tools:
+
+```bash
+python -m mcp_server_hiagent_knowledge.main \
+  -t search_wiki,read_wiki_page,read_wiki_source_chunk,read_wiki_source_doc
+```
+
 ### Available Tools
 
 #### health_check
@@ -106,11 +132,12 @@ health_check()
 
 #### list_datasets
 
-List knowledge bases (datasets) in a workspace, so callers can obtain the `DatasetIDs` required by the knowledge engine.
+List knowledge bases (datasets) in a workspace, so callers can obtain the `DatasetIDs` required by the knowledge engine. Pass `name` to fuzzy-search knowledge bases by name.
 
 ```python
 list_datasets(
     workspace_id="workspace_id",
+    name="finance",
     page_number=1,
     page_size=20,
 )
@@ -118,6 +145,7 @@ list_datasets(
 
 Parameters:
 - `workspace_id` (required): the workspace id to list datasets for.
+- `name` (optional): name substring for fuzzy search; the backend matches it against dataset name/description. Omit to list all datasets.
 - `page_number` (optional): page number (default: 1).
 - `page_size` (optional): page size (default: 20).
 
@@ -145,8 +173,6 @@ search_knowledge(
     workspace_id="workspace_id",
     dataset_ids=["dataset_id"],
     queries=["How to reset my password?"],
-    top_k=3,
-    score_threshold=0.2,
 )
 ```
 
@@ -154,9 +180,6 @@ Parameters:
 - `workspace_id` (required): the workspace id the datasets belong to.
 - `dataset_ids` (required): list of dataset ids to search, at least one.
 - `queries` (required): list of natural-language query strings, at least one.
-- `top_k` (optional): maximum number of results to return.
-- `score_threshold` (optional): minimum relevance score to keep.
-- `rerank_id` (optional): rerank model id.
 
 #### grep_knowledge_chunks
 

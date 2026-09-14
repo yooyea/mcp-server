@@ -32,9 +32,9 @@ HiAgent OpenAPI 通过单个 `CallKnowledgeEngineTool` action 暴露知识引擎
 | `read_wiki_source_chunk` | `CallKnowledgeEngineTool` | `wiki_read_source_chunk` | `WikiReadSourceChunk` | 按页面 slug 读取 Wiki 引用的切片 |
 | `read_wiki_source_doc` | `CallKnowledgeEngineTool` | `list_knowledge_chunks` | `ListKnowledgeChunks` | 按 resource_id 顺序读取某引用源文档的切片 |
 
-> 说明：HiAgent 中 dataset 即知识库，故 `list_datasets` / `get_dataset` 是「列/查知识库」能力。每个知识引擎工具还接受可选的 `user_info`（`{"UserID": ..., "UserChannel": ...}`），原样透传为 OpenAPI 的 `UserInfo` 终端用户身份。
+> 说明：HiAgent 中 dataset 即知识库，故 `list_datasets` / `get_dataset` 是「列/查知识库」能力。每个知识引擎工具还接受可选的 `user_info`（`{"UserID": ..., "UserChannel": ...}`），原样透传为 OpenAPI 的 `UserInfo` 终端用户身份。仅当 `UserChannel="IAM"`（或可映射到 IAM 用户的 `"Lark"`）且 `UserID` 为租户内真实用户时，后端才据此做知识库/文档级权限过滤；其它渠道按游客处理。透传它可让检索遵循终端用户自身的访问权限。
 
-> 校验模型：本 Server 是薄适配层，只校验「必须发送的字段是否存在」（workspace/dataset ID、能力要求的 pattern/slug/queries 等）并依赖工具 schema 的参数类型；数值范围、枚举、跨字段规则（如 `top_k`/`limit`/`overlap` 的上下限、`grep_type` 的范围约束）由后端服务负责且随版本变化，因此其 `InvalidParameter.*` 报错会原样透传给调用方，不在本层重复校验。
+> 校验模型：本 Server 是薄适配层，只校验「必须发送的字段是否存在」（workspace/dataset ID、能力要求的 pattern/slug/queries 等）并依赖工具 schema 的参数类型；数值范围、枚举、跨字段规则（如 `limit`/`overlap` 的上下限、`grep_type` 的范围约束）由后端服务负责且随版本变化，因此其 `InvalidParameter.*` 报错会原样透传给调用方，不在本层重复校验。
 
 ## 使用指南
 
@@ -63,11 +63,29 @@ cd mcp-server/server/mcp_server_hiagent_knowledge
 uv run mcp-server-hiagent-knowledge
 
 # 使用 streamable-http 模式启动（默认为 stdio）
-uv run mcp-server-hiagent-knowledge -t streamable-http
+uv run mcp-server-hiagent-knowledge --transport streamable-http
 
 # 显式指定 HiAgent OpenAPI 版本（覆盖 HIAGENT_VERSION 环境变量；不填默认用最新）
 uv run mcp-server-hiagent-knowledge --hiagent-version v3.1.0
+
+# 只暴露部分工具（白名单，逗号分隔，-t 是 --tools 的简写）——
+# 例如只保留 Wiki 相关工具，让模型稳定走 Wiki 检索
+uv run mcp-server-hiagent-knowledge -t search_wiki,read_wiki_page,read_wiki_source_chunk,read_wiki_source_doc
+
+# 屏蔽个别工具（黑名单，在白名单基础上再剔除；不给白名单时相当于从全部工具中剔除）
+uv run mcp-server-hiagent-knowledge --disabled-tools grep_knowledge_chunks
 ```
+
+#### 工具范围过滤
+
+默认暴露全部工具。可用两个可选参数收窄暴露的工具集（都接受逗号分隔的**精确工具名**，未知名会直接报错退出；`health_check` 始终保留）：
+
+| 参数 | 简写 | 环境变量 | 说明 |
+|---|---|---|---|
+| `--tools` | `-t` | `HIAGENT_TOOLS` | 白名单：选定基础工具集；不填表示全部工具 |
+| `--disabled-tools` | - | `HIAGENT_DISABLED_TOOLS` | 黑名单：在白名单（或全部工具）基础上再剔除 |
+
+生效顺序：先由 `--tools` 选出基础集（不填=全部），再用 `--disabled-tools` 从中剔除。每个参数的取值优先级为**命令行参数 > 同名环境变量 > 不设置**；环境变量取空值或纯空白（如 `HIAGENT_TOOLS=`）等同于不设置（=全部工具），不会把工具收窄到只剩 `health_check`。典型用法：知识库里同时挂了普通文档与生成的 Wiki，若希望模型稳定检索 Wiki，用 `-t` 只暴露 `search_wiki` / `read_wiki_page` / `read_wiki_source_chunk` / `read_wiki_source_doc` 即可。
 
 使用客户端与服务器交互：
 
@@ -88,6 +106,8 @@ Trae | Cursor | Claude Desktop | Cline | HiAgent MCP 插件 | ...
 | `HIAGENT_SECRET_ACCESS_KEY` | HiAgent 账号 SecretAccessKey | - |
 | `HIAGENT_ACCOUNT_ID` | 作为 `X-Account-Id` 查询参数发送的主账号 ID | `1000000000` |
 | `HIAGENT_VERSION` | 使用的 HiAgent OpenAPI 兼容版本，对应 `versions/` 下的自包含实现；不填默认使用最新已注册版本（当前为 `v3.1.0`）。也可用 `--hiagent-version` 命令行参数按次指定，且优先级更高；当前支持 `v3.1.0` | 最新（`v3.1.0`） |
+| `HIAGENT_TOOLS` | 工具白名单，逗号分隔的精确工具名；选定暴露的基础工具集，不填表示全部。可用 `--tools`/`-t` 命令行参数按次指定，优先级更高 | - |
+| `HIAGENT_DISABLED_TOOLS` | 工具黑名单，逗号分隔；在白名单（或全部工具）基础上再剔除。可用 `--disabled-tools` 命令行参数按次指定，优先级更高 | - |
 | `HIAGENT_REGION` | 用于 AK/SK V4 签名的 Region（非网络地址） | `cn-north-1` |
 | `FASTMCP_CHECK_FOR_UPDATES` | 设为 `off`，否则 FastMCP 启动时的联网版本检查在受限网络下可能导致启动失败 | - |
 | `MCP_SERVER_HOST` | MCP server 绑定 host（streamable-http） | `127.0.0.1` |
@@ -120,6 +140,7 @@ health_check()
 ```python
 list_datasets(
     workspace_id="workspace_id",
+    name="财报",
     page_number=1,
     page_size=20,
 )
@@ -127,6 +148,7 @@ list_datasets(
 
 Parameters:
 - `workspace_id` (必须): 要列出知识库的 workspace ID
+- `name` (可选): 按名称模糊搜索的关键词（后端对知识库名称/描述做模糊匹配）；不传则列出全部
 - `page_number` (可选): 页码（默认值：1）
 - `page_size` (可选): 每页数量（默认值：20）
 
@@ -150,8 +172,6 @@ search_knowledge(
     workspace_id="workspace_id",
     dataset_ids=["dataset_id"],
     queries=["如何重置密码？"],
-    top_k=3,
-    score_threshold=0.2,
 )
 ```
 
@@ -159,9 +179,6 @@ Parameters:
 - `workspace_id` (必须): 知识库所属的 workspace ID
 - `dataset_ids` (必须): 要检索的知识库 ID 列表，至少 1 个
 - `queries` (必须): 检索查询词列表，至少 1 个
-- `top_k` (可选): 返回的最大结果数
-- `score_threshold` (可选): 保留结果的最小相关性分数
-- `rerank_id` (可选): 重排模型 ID
 
 #### grep_knowledge_chunks
 
