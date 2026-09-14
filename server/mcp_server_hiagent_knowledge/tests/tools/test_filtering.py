@@ -63,3 +63,27 @@ def test_resolve_unknown_error_lists_all_offenders() -> None:
         resolve_enabled_tools(ALL, enabled=["x"], disabled=["y"])
     message = str(excinfo.value)
     assert "x" in message and "y" in message
+
+
+def test_resolve_always_on_name_is_accepted_not_unknown() -> None:
+    # An always-on name is valid input but is filtered out of the base set
+    # (the server keeps it separately).
+    assert resolve_enabled_tools(ALL, enabled=["keepme"], always_on=["keepme"]) == []
+
+
+def test_resolve_always_on_accepted_in_denylist() -> None:
+    # Listing an always-on name in the denylist must not raise (the server keeps
+    # it regardless); it simply has no effect on the filterable base set.
+    assert resolve_enabled_tools(ALL, disabled=["keepme"], always_on=["keepme"]) == [
+        "a",
+        "b",
+        "c",
+        "d",
+    ]
+
+
+def test_resolve_unknown_error_mentions_always_on() -> None:
+    with pytest.raises(ValueError) as excinfo:
+        resolve_enabled_tools(ALL, enabled=["zzz"], always_on=["keepme"])
+    message = str(excinfo.value)
+    assert "always kept" in message and "keepme" in message

@@ -96,6 +96,13 @@ def test_empty_allowlist_keeps_only_health_check() -> None:
     assert _tool_names(server) == {"health_check"}
 
 
+def test_allowlist_may_list_health_check_explicitly() -> None:
+    # health_check is always kept; listing it explicitly must not error.
+    server = create_mcp_server(client=RecordingClient(), enabled_tools=["health_check"])
+
+    assert _tool_names(server) == {"health_check"}
+
+
 def test_unknown_tool_name_raises() -> None:
     with pytest.raises(ValueError, match="unknown tool name"):
         create_mcp_server(client=RecordingClient(), enabled_tools=["does_not_exist"])

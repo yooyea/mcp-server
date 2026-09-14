@@ -62,11 +62,13 @@ def create_mcp_server(
     openapi_client = client or HiAgentOpenAPIClient(hiagent_config)
 
     # ``health_check`` is always on; only the business tools are filterable.
+    # Passing it as ``always_on`` lets a user list it explicitly without error.
     keep = set(
         resolve_enabled_tools(
             FILTERABLE_TOOL_NAMES,
             enabled=enabled_tools,
             disabled=disabled_tools,
+            always_on=(ALWAYS_ON_TOOL_NAME,),
         )
     )
 

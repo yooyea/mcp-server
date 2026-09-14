@@ -37,29 +37,43 @@ def resolve_enabled_tools(
     *,
     enabled: Iterable[str] | None = None,
     disabled: Iterable[str] | None = None,
+    always_on: Iterable[str] = (),
 ) -> list[str]:
     """Resolve the enabled tool names from an allowlist and denylist.
 
     - ``enabled`` (allowlist) picks the base set; ``None`` means all tools.
     - ``disabled`` (denylist) is subtracted from the base set.
+    - ``always_on`` names are tools the server keeps regardless of the filter
+      (e.g. ``health_check``). They are accepted as valid names in either filter
+      so a user can list one without error, but they are not part of ``all_tools``
+      and never appear in the returned base set (the server adds them back).
 
     The returned list preserves ``all_tools`` order. Raises ``ValueError`` listing
     every unknown name found in either filter (so a typo fails fast).
     """
 
     known = set(all_tools)
+    always_on_set = set(always_on)
 
     enabled_set = set(enabled) if enabled is not None else None
     disabled_set = set(disabled or ())
 
-    unknown = sorted(((enabled_set or set()) | disabled_set) - known)
+    # ``always_on`` names are valid input even though they are filtered out of the
+    # base set: the server keeps them unconditionally, so listing one must not error.
+    unknown = sorted(((enabled_set or set()) | disabled_set) - known - always_on_set)
     if unknown:
-        raise ValueError(
+        message = (
             "unknown tool name(s): "
             + ", ".join(unknown)
             + "; known tools: "
             + ", ".join(all_tools)
         )
+        if always_on_set:
+            message += (
+                "; always kept (no need to list): "
+                + ", ".join(sorted(always_on_set))
+            )
+        raise ValueError(message)
 
     base = list(all_tools) if enabled_set is None else [
         name for name in all_tools if name in enabled_set
