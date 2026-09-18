@@ -4,7 +4,7 @@ MCP server **and** CLI for the OpenViking control plane (topapi) — manage OV
 libraries (`Collection`). Both front-ends share one core (`client.py`), so a tool
 added once is available from MCP and the CLI alike.
 
-Covers 11 collection lifecycle, billing, and user-management Actions:
+Covers 14 collection lifecycle, billing, user-management, and data-space Actions:
 
 | Action | MCP tool | CLI command |
 |---|---|---|
@@ -14,17 +14,32 @@ Covers 11 collection lifecycle, billing, and user-management Actions:
 | `UpdateOpenVikingCollection` | `update_collection` | `ov-cp update <rid>` |
 | `DeleteOpenVikingCollection` | `delete_collection` ⚠️ | `ov-cp delete <rid>` |
 | `GetOpenVikingUsage` | `get_usage` | `ov-cp usage <rid>` |
-| `AccessOpenVikingApiKey` (`/GetOpenVikingCollectionUserAccess`) | `get_collection_api_key` | `ov-cp api-key <rid>` |
-| `ListOpenVikingUser` (`/ListOpenVikingCollectionUser`) | `list_collection_users` | `ov-cp user list <rid>` |
-| `RegisterOpenVikingUser` | `register_collection_user` | `ov-cp user register <rid>` |
+| `GetOpenVikingCollectionUserAccess` | `get_collection_api_key` | `ov-cp api-key <rid>` |
+| `ListOpenVikingCollectionUser` | `list_collection_users` | `ov-cp user list <rid>` |
+| `RegisterOpenVikingUser` | `register_collection_user` | `ov-cp user register <rid> <uid>` |
 | `UpdateOpenVikingUser` | `update_collection_user` | `ov-cp user update <rid> <uid>` |
 | `DeleteOpenVikingUser` | `delete_collection_user` ⚠️ | `ov-cp user delete <rid> <uid>` |
+| `ListOpenVikingAccounts` | `list_collection_accounts` | `ov-cp account list <rid>` |
+| `CreateOpenVikingAccount` | `create_collection_account` | `ov-cp account create <rid> <account-id>` |
+| `DeleteOpenVikingAccount` | `delete_collection_account` ⚠️ | `ov-cp account delete <rid> <account-id>` |
 
 The `user *` actions manage the multiple users of an enterprise-tier library; they
 require the AgentPlan key to be **associated with the target library**. A user's
 `ApiKey` from `user list` is **masked** — fetch a selected user's plaintext
 data-plane key via `api-key <rid> --user-id <uid>`. Newly registered users always
 have role `user`; `user update` currently supports API Key rotation only.
+
+The `account *` actions manage enterprise-tier data spaces: first-level isolation
+boundaries for users, credentials, memories, resources, sessions, and skills. The
+released backend uses account `default` when `--account-id` is omitted, preserving
+existing behavior. Every account-aware action serializes the scope as
+`OpenVikingAccountID` on the wire. Creating one automatically adds its `default`
+admin user. An OpenVikingAccountID is 1-64 characters using only ASCII letters,
+digits, `_`, `.`, `@`, or `-`; it cannot start with `_`, equal `.` or `..`, or
+contain more than one `@`. The per-library quota is backend-configured (currently
+100 by default). Deleting a data space cascades to everything inside it and is
+irreversible; `default` cannot be deleted. Treat `CreateTime` from `account list`
+as an opaque backend timestamp string.
 
 ## Endpoint
 
@@ -53,8 +68,8 @@ pluggable (`common/auth.py` → `BearerTokenAuth`); an AK/SK signer can be swapp
 later without touching the rest.
 
 > ⚠️ Write actions like `create` require the account to have **AgentPlan deduction
-> activated**, otherwise they return `ProductUnordered`. Read-only actions
-> (list/get/usage/delete) are not gated.
+> activated**, otherwise they return `ProductUnordered`. Operations on an existing
+> library can additionally require the AgentPlan key to be associated with that library.
 
 ### Configuration
 
@@ -67,7 +82,7 @@ later without touching the rest.
 
 `VIKING_EXTRA_HEADERS` is a comma-separated list of `Key: Value` pairs; `--header`
 takes one pair and may be repeated (CLI wins over env). Both are merged onto every
-request — useful for swim-lane routing, e.g. `-H 'x-tt-env: lujiakun'`. The
+request — useful for swim-lane routing, e.g. `-H 'x-tt-env: <swimlane>'`. The
 `Authorization` and `Content-Type` headers are protected and cannot be overridden.
 
 ## CLI usage
@@ -82,8 +97,13 @@ export AGENTPLAN_API_KEY=ark-xxxxxxxx
 uv run ov-cp list
 uv run ov-cp get   <ResourceID>
 uv run ov-cp usage <ResourceID>
+uv run ov-cp usage <ResourceID> --account-id team-alpha
+uv run ov-cp usage <ResourceID> --user-id alice  # user in default data space
+uv run ov-cp usage <ResourceID> --account-id team-alpha --user-id alice
 uv run ov-cp api-key <ResourceID>
-uv run ov-cp api-key <ResourceID> --user-id xiaohong
+uv run ov-cp api-key <ResourceID> --user-id alice
+uv run ov-cp api-key <ResourceID> --account-id team-alpha
+uv run ov-cp api-key <ResourceID> --account-id team-alpha --user-id alice
 
 # create (consumes paid quota; always uses the AgentPlan model path and the
 # configured AgentPlan key; model source/parameters and image version are hidden)
@@ -121,17 +141,22 @@ uv run ov-cp update <ResourceID> --model-api-key ark-xxxxxxxx
 
 # manage users of an enterprise-tier library (key must be associated with it)
 uv run ov-cp user list     <ResourceID>
-uv run ov-cp user list     <ResourceID> --role user --page 1 --limit 20
-uv run ov-cp user register <ResourceID> xiaohong
-uv run ov-cp user update   <ResourceID> xiaohong --regenerate-key
-uv run ov-cp user delete   <ResourceID> xiaohong --yes
+uv run ov-cp user list     <ResourceID> --account-id team-alpha --role user --page 1 --limit 20
+uv run ov-cp user register <ResourceID> alice --account-id team-alpha
+uv run ov-cp user update   <ResourceID> alice --account-id team-alpha --regenerate-key
+uv run ov-cp user delete   <ResourceID> alice --account-id team-alpha --yes
+
+# manage data spaces (accounts) in an enterprise-tier library
+uv run ov-cp account list   <ResourceID> --keyword team --page 1 --limit 20
+uv run ov-cp account create <ResourceID> team-alpha
+uv run ov-cp account delete <ResourceID> team-alpha  # prompts before cascading deletion
 
 # delete (irreversible)
 uv run ov-cp delete <ResourceID> --yes
 ```
 
 When stdout is a terminal, `--output auto` (the default) renders structured
-Rich views: tables for collection/user lists, sectioned detail panels for
+Rich views: tables for collection/user/data-space lists, sectioned detail panels for
 `get`/`usage`, compact success cards for mutations, and a warning panel for
 plaintext API keys. Piping or redirecting automatically keeps standard JSON:
 
@@ -143,10 +168,11 @@ uv run ov-cp --output json-compact list
 uv run ov-cp --output pretty list     # force the terminal view
 ```
 
-`usage` preserves the backend's legacy `EstimatedCosts` field and also returns
-`EstimatedBilling` with an explicit hourly period and CNY unit. For collections
-paid by AgentPlan it includes the equivalent AFP deduction and payment scenario;
-for `volc_pay` it reports CNY only.
+Library-wide `usage` preserves the backend's legacy `EstimatedCosts` field and also
+returns `EstimatedBilling` with an explicit hourly period and CNY unit. For
+collections paid by AgentPlan it includes the equivalent AFP deduction and payment
+scenario; for `volc_pay` it reports CNY only. Account- or user-scoped usage omits
+both library-wide estimates. `--user-id` may be used alone for the `default` account.
 
 Flags override env. The endpoint defaults to the public gateway; override it only
 for testing (e.g. against a port-forward) with `-e` / `VIKING_ENDPOINT` —
@@ -168,7 +194,7 @@ gateway. Add to `.mcp.json`:
       "command": "uvx",
       "args": [
         "--from",
-        "mcp-server-openviking-controlplane>=0.2.0",
+        "mcp-server-openviking-controlplane>=0.3.0",
         "mcp-server-openviking-controlplane"
       ],
       "env": {
@@ -267,6 +293,7 @@ A Claude Code / agent skill that documents the `ov-cp` workflow lives at
 Symlink or copy it into your agent's skills directory (e.g. `~/.claude/skills/`) to
 let an agent drive the control plane.
 
-> ⚠️ `create_collection` / `delete_collection` create/destroy **billable** resources and
-> are exposed as MCP tools; their descriptions instruct the model to confirm with you
-> first. Rely on your client's tool-permission prompt as the final gate.
+> ⚠️ `create_collection` / `delete_collection` create/destroy **billable** resources,
+> while `delete_collection_account` irreversibly destroys a data space and all of its
+> contents. These are exposed as MCP tools; their descriptions instruct the model to
+> confirm with you first. Rely on your client's tool-permission prompt as the final gate.
