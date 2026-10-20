@@ -57,6 +57,49 @@ def test_injected_client_is_used_without_headers() -> None:
     assert client.calls[0]["body"]["WorkspaceID"] == "ws-1"
 
 
+@pytest.mark.parametrize(
+    "options, expected_arguments",
+    [
+        pytest.param(
+            {"keyword": "shared", "limit": 20, "cursor": "next-page"},
+            {"Filter": {"Keyword": "shared"}, "Limit": 20, "Cursor": "next-page"},
+            id="pagination",
+        ),
+        pytest.param(
+            {"keyword": "shared", "ids": ["ds-1", "ds-2"]},
+            {"Filter": {"Keyword": "shared"}, "IDs": ["ds-1", "ds-2"]},
+            id="ids",
+        ),
+    ],
+)
+def test_shared_discovery_tool_forwards_filters_and_iam_identity(
+    options: dict[str, object], expected_arguments: dict[str, object],
+) -> None:
+    client = RecordingClient()
+    server = create_mcp_server(client=client)
+
+    async def run() -> None:
+        await server.call_tool("list_datasets_with_shared", {
+            "workspace_id": "ws-1",
+            "user_id": "user-1",
+            **options,
+        })
+
+    asyncio.run(run())
+
+    assert client.calls == [{
+        "action": "CallKnowledgeEngineTool",
+        "version": "2023-08-01",
+        "service": "app",
+        "body": {
+            "WorkspaceID": "ws-1",
+            "ToolName": "list_datasets_with_shared",
+            "UserInfo": {"UserID": "user-1", "UserChannel": "IAM"},
+            "ListDatasetsWithShared": expected_arguments,
+        },
+    }]
+
+
 def test_enabled_tools_allowlist_narrows_scope() -> None:
     server = create_mcp_server(
         client=RecordingClient(),
