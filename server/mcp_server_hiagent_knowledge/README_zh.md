@@ -32,7 +32,7 @@ HiAgent OpenAPI 通过单个 `CallKnowledgeEngineTool` action 暴露知识引擎
 | `read_wiki_source_chunk` | `CallKnowledgeEngineTool` | `wiki_read_source_chunk` | `WikiReadSourceChunk` | 按页面 slug 读取 Wiki 引用的切片 |
 | `read_wiki_source_doc` | `CallKnowledgeEngineTool` | `list_knowledge_chunks` | `ListKnowledgeChunks` | 按 resource_id 顺序读取某引用源文档的切片 |
 
-> 说明：HiAgent 中 dataset 即知识库，故 `list_datasets` / `get_dataset` 是「列/查知识库」能力。每个知识引擎工具还接受可选的 `user_info`（`{"UserID": ..., "UserChannel": ...}`），原样透传为 OpenAPI 的 `UserInfo` 终端用户身份。仅当 `UserChannel="IAM"`（或可映射到 IAM 用户的 `"Lark"`）且 `UserID` 为租户内真实用户时，后端才据此做知识库/文档级权限过滤；其它渠道按游客处理。透传它可让检索遵循终端用户自身的访问权限。
+> 说明：HiAgent 中 dataset 即知识库，故 `list_datasets_with_shared` / `get_dataset` 是「列/查知识库」能力。检索工具还接受可选的 `user_info`（`{"UserID": ..., "UserChannel": ...}`），原样透传为 OpenAPI 的 `UserInfo` 终端用户身份。仅当 `UserChannel="IAM"`（或可映射到 IAM 用户的 `"Lark"`）且 `UserID` 为租户内真实用户时，后端才据此做知识库/文档级权限过滤；其它渠道按游客处理。透传它可让检索遵循终端用户自身的访问权限。
 
 > 校验模型：本 Server 是薄适配层，只校验「必须发送的字段是否存在」（workspace/dataset ID、能力要求的 pattern/slug/queries 等）并依赖工具 schema 的参数类型；数值范围、枚举、跨字段规则（如 `limit`/`overlap` 的上下限、`grep_type` 的范围约束）由后端服务负责且随版本变化，因此其 `InvalidParameter.*` 报错会原样透传给调用方，不在本层重复校验。
 
@@ -118,7 +118,7 @@ Trae | Cursor | Claude Desktop | Cline | HiAgent MCP 插件 | ...
 HiAgent Knowledge MCP Server 提供以下功能：
 
 - `health_check`: 返回 MCP server 与 OpenAPI 的配置状态
-- `list_datasets`: 列出指定 workspace 下的知识库列表
+- `list_datasets_with_shared`: 列出当前 workspace 中可访问的自有及共享知识库
 - `get_dataset`: 获取单个知识库的详细信息
 - `search_knowledge`: 在一个或多个知识库中按相关性检索知识片段
 - `grep_knowledge_chunks`: 按 RE2 正则匹配知识切片
@@ -135,22 +135,34 @@ HiAgent Knowledge MCP Server 提供以下功能：
 health_check()
 ```
 
-#### list_datasets
+#### list_datasets_with_shared
+
+发现当前 Workspace 中 IAM 用户可访问的自有及共享知识库，通过
+`CallKnowledgeEngineTool` 的 `list_datasets_with_shared` 子工具调用。
 
 ```python
-list_datasets(
+list_datasets_with_shared(
     workspace_id="workspace_id",
-    name="财报",
-    page_number=1,
-    page_size=20,
+    user_id="iam_user_id",
+    keyword="财报",
+    limit=20,
 )
 ```
 
-Parameters:
-- `workspace_id` (必须): 要列出知识库的 workspace ID
-- `name` (可选): 按名称模糊搜索的关键词（后端对知识库名称/描述做模糊匹配）；不传则列出全部
-- `page_number` (可选): 页码（默认值：1）
-- `page_size` (可选): 每页数量（默认值：20）
+- `workspace_id`：必填，当前 Workspace。
+- `user_id`：可选 IAM 用户 ID，身份渠道固定为 IAM；不传则由服务端解析凭证对应用户。
+- `keyword`：可选名称/描述关键词，对应 `ListDatasetsWithShared.Filter.Keyword`。
+- `limit`：可选，每页 1..100 条；不传时服务端默认 100。
+- `cursor`：可选，上一页的 `NextCursor`。翻页时保持用户、Workspace、关键词及 limit 不变。
+- `ids`：可选 ID 列表；`[]` 表示空结果，与显式 `limit`/`cursor` 互斥。
+
+返回完整 OpenAPI 响应，结果位于 `Result.ListDatasetsWithShared`：`Items` 含
+`DatasetID`、`WorkspaceID`、`IndexTypes` 等摘要字段，`NextCursor` 仅在有下一页时返回，
+不包含 `Total`。权限和参数值域由服务端校验。
+
+迁移：旧 `list_datasets` 已移除；工具过滤配置改用新名称，`name` 改为 `keyword`，
+页码参数改为 `limit`/`cursor`，结果读取改用上述路径。刷新客户端工具列表。
+目标 HiAgent 服务须支持此知识引擎子工具；不自动回退至旧 `ListDatasets` Action。
 
 #### get_dataset
 

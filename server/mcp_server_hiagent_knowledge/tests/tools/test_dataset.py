@@ -4,91 +4,94 @@ from typing import Any
 
 import pytest
 
-from mcp_server_hiagent_knowledge.versions.v3_1_0.tools.dataset import get_dataset, list_datasets
+from mcp_server_hiagent_knowledge.versions.v3_1_0.tools.dataset import (
+    get_dataset,
+    list_datasets_with_shared,
+)
 
 
 class RecordingClient:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
+        self.response = {
+            "Result": {"ListDatasetsWithShared": {
+                "Items": [{"DatasetID": "shared-1", "IndexTypes": ["Wiki"]}],
+                "NextCursor": "opaque-next",
+            }},
+        }
 
     def call(self, **kwargs: Any) -> dict[str, object]:
         self.calls.append(kwargs)
-        return {"ResponseMetadata": {"Action": kwargs["action"]}, "Result": {}}
+        return self.response
 
 
-def test_list_datasets_builds_workspace_request() -> None:
+def test_shared_discovery_defaults_and_response() -> None:
     client = RecordingClient()
-
-    list_datasets(client, workspace_id="ws-1", page_number=2, page_size=10)
-
-    assert client.calls[0] == {
-        "action": "ListDatasets",
+    result = list_datasets_with_shared(client, workspace_id="ws-1")
+    assert result is client.response
+    assert client.calls == [{
+        "action": "CallKnowledgeEngineTool",
         "version": "2023-08-01",
         "service": "app",
         "body": {
             "WorkspaceID": "ws-1",
-            "PageNumber": 2,
-            "PageSize": 10,
+            "ToolName": "list_datasets_with_shared",
+            "ListDatasetsWithShared": {},
+        },
+    }]
+
+
+def test_shared_discovery_cursor_filter_and_identity() -> None:
+    client = RecordingClient()
+    list_datasets_with_shared(
+        client, workspace_id="ws-1", user_id="iam-user-1",
+        keyword="finance", limit=10, cursor="opaque-next",
+    )
+    assert client.calls[0]["body"] == {
+        "WorkspaceID": "ws-1",
+        "ToolName": "list_datasets_with_shared",
+        "UserInfo": {"UserID": "iam-user-1", "UserChannel": "IAM"},
+        "ListDatasetsWithShared": {
+            "Filter": {"Keyword": "finance"}, "Limit": 10, "Cursor": "opaque-next",
         },
     }
 
 
-def test_list_datasets_defaults() -> None:
+@pytest.mark.parametrize("ids", [[], ["ds-2", "ds-1", "ds-2"]])
+def test_shared_discovery_ids_preserve_empty_and_order(ids: list[str]) -> None:
     client = RecordingClient()
-
-    list_datasets(client, workspace_id="ws-1")
-
-    assert client.calls[0]["body"]["PageNumber"] == 1
-    assert client.calls[0]["body"]["PageSize"] == 20
+    list_datasets_with_shared(client, workspace_id="ws-1", ids=ids)
+    assert client.calls[0]["body"]["ListDatasetsWithShared"] == {"IDs": ids}
 
 
-def test_list_datasets_without_name_omits_filter() -> None:
+def test_shared_discovery_empty_filter_and_cursor_are_forwarded() -> None:
     client = RecordingClient()
+    list_datasets_with_shared(client, workspace_id="ws-1", keyword="", cursor="")
+    assert client.calls[0]["body"]["ListDatasetsWithShared"] == {
+        "Filter": {"Keyword": ""}, "Cursor": "",
+    }
 
-    list_datasets(client, workspace_id="ws-1")
 
-    assert "Filter" not in client.calls[0]["body"]
-
-
-def test_list_datasets_name_builds_fuzzy_filter() -> None:
+@pytest.mark.parametrize("limit", [0, 101])
+def test_shared_discovery_leaves_value_validation_to_backend(limit: int) -> None:
     client = RecordingClient()
-
-    list_datasets(client, workspace_id="ws-1", name="finance")
-
-    assert client.calls[0]["body"]["Filter"] == {"Name": "finance"}
+    list_datasets_with_shared(client, workspace_id="ws-1", ids=[], limit=limit)
+    assert client.calls[0]["body"]["ListDatasetsWithShared"] == {"IDs": [], "Limit": limit}
 
 
-def test_list_datasets_empty_name_still_builds_filter() -> None:
-    # Only ``None`` omits the filter; an explicit empty string is passed through
-    # verbatim (consistent with the pagination args), leaving it to the backend.
+def test_shared_discovery_requires_workspace() -> None:
     client = RecordingClient()
-
-    list_datasets(client, workspace_id="ws-1", name="")
-
-    assert client.calls[0]["body"]["Filter"] == {"Name": ""}
-
-
-def test_list_datasets_requires_workspace() -> None:
-    with pytest.raises(ValueError):
-        list_datasets(RecordingClient(), workspace_id="")
+    with pytest.raises(ValueError, match="workspace_id"):
+        list_datasets_with_shared(client, workspace_id="")
+    assert not client.calls
 
 
-@pytest.mark.parametrize(
-    "page_number,page_size",
-    [(0, 20), (1, 0), (1, 101)],
-)
-def test_list_datasets_passes_pagination_through(page_number: int, page_size: int) -> None:
-    # Pagination bounds are enforced by the OpenAPI layer, not here; whatever
-    # the caller passes is forwarded verbatim.
+@pytest.mark.parametrize("user_id", ["", "   "])
+def test_shared_discovery_rejects_empty_explicit_identity(user_id: str) -> None:
     client = RecordingClient()
-    list_datasets(
-        client,
-        workspace_id="ws-1",
-        page_number=page_number,
-        page_size=page_size,
-    )
-    assert client.calls[0]["body"]["PageNumber"] == page_number
-    assert client.calls[0]["body"]["PageSize"] == page_size
+    with pytest.raises(ValueError, match="user_id"):
+        list_datasets_with_shared(client, workspace_id="ws-1", user_id=user_id)
+    assert not client.calls
 
 
 def test_get_dataset_builds_request() -> None:

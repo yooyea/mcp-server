@@ -28,7 +28,7 @@ def test_server_registers_knowledge_engine_tools() -> None:
 
     assert names == {
         "health_check",
-        "list_datasets",
+        "list_datasets_with_shared",
         "get_dataset",
         "search_knowledge",
         "grep_knowledge_chunks",
@@ -48,12 +48,12 @@ def test_injected_client_is_used_without_headers() -> None:
     server = create_mcp_server(client=client)
 
     async def run() -> None:
-        await server.call_tool("list_datasets", {"workspace_id": "ws-1"})
+        await server.call_tool("list_datasets_with_shared", {"workspace_id": "ws-1"})
 
     asyncio.run(run())
 
     assert client.calls
-    assert client.calls[0]["action"] == "ListDatasets"
+    assert client.calls[0]["action"] == "CallKnowledgeEngineTool"
     assert client.calls[0]["body"]["WorkspaceID"] == "ws-1"
 
 
@@ -77,7 +77,7 @@ def test_disabled_tools_denylist_removes_scope() -> None:
     assert "grep_knowledge_chunks" not in names
     assert "search_knowledge" not in names
     assert "health_check" in names
-    assert "list_datasets" in names
+    assert "list_datasets_with_shared" in names
 
 
 def test_allowlist_then_denylist_compose() -> None:
@@ -106,3 +106,25 @@ def test_allowlist_may_list_health_check_explicitly() -> None:
 def test_unknown_tool_name_raises() -> None:
     with pytest.raises(ValueError, match="unknown tool name"):
         create_mcp_server(client=RecordingClient(), enabled_tools=["does_not_exist"])
+
+
+def test_shared_discovery_schema_exposes_no_identity_channel() -> None:
+    server = create_mcp_server(client=RecordingClient())
+    tools = asyncio.run(server.list_tools())
+    tool = next(t for t in tools if t.name == "list_datasets_with_shared")
+    assert set(tool.parameters["properties"]) == {
+        "workspace_id", "user_id", "keyword", "limit", "cursor", "ids",
+    }
+
+
+def test_shared_discovery_is_filterable_by_new_name() -> None:
+    server = create_mcp_server(
+        client=RecordingClient(), enabled_tools=["list_datasets_with_shared"],
+    )
+    assert _tool_names(server) == {"health_check", "list_datasets_with_shared"}
+    server = create_mcp_server(
+        client=RecordingClient(), disabled_tools=["list_datasets_with_shared"],
+    )
+    assert "list_datasets_with_shared" not in _tool_names(server)
+    with pytest.raises(ValueError, match="unknown tool name"):
+        create_mcp_server(client=RecordingClient(), enabled_tools=["list_datasets"])

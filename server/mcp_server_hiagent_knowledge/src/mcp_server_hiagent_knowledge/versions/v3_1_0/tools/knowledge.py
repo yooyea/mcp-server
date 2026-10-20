@@ -437,7 +437,7 @@ def register_knowledge_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
         即答案措辞可能与提问不同的场景。返回候选分段用于导航——把它们当作"在哪找"，
         而非最终证据；回答事实前建议用 ``list_document_chunks`` 深读原文。
 
-        用 ``list_datasets`` 获取知识库 id。常与 ``grep_knowledge_chunks``（精确锚定）配合以扩大召回。
+        用 ``list_datasets_with_shared`` 获取知识库 id。常与 ``grep_knowledge_chunks``（精确锚定）配合以扩大召回。
 
         参数：
         - workspace_id：知识库所属的 workspace。
