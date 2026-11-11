@@ -4,7 +4,7 @@ This MCP server exposes a **knowledge base (knowledge engine)** as MCP tools. Ea
 
 ## Features
 
-- Discover knowledge bases (datasets) the calling identity can access — own and visible shared — and inspect a single dataset
+- List knowledge bases (datasets) in a workspace, and inspect a single dataset
 - Search knowledge across datasets by relevance (`search_knowledge`)
 - Match chunks by RE2 regex (`grep_knowledge_chunks`)
 - Read documents' metadata in batch (`list_document_infos`) and a document's chunks in order (`list_document_chunks`)
