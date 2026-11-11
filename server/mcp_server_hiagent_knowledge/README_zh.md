@@ -10,7 +10,7 @@ HiAgent Knowledge MCP Server 是一个模型上下文协议（Model Context Prot
 
 ## 功能
 
-- 列出指定 workspace 下的知识库列表，并查看单个知识库详情
+- 发现调用身份可访问的知识库（自有库与可见共享库），并查看单个知识库详情
 - 在一个或多个知识库中按相关性检索知识片段（`search_knowledge`）
 - 按 RE2 正则匹配切片（`grep_knowledge_chunks`）
 - 批量读取文档元数据（`list_document_infos`）与按顺序读取文档切片（`list_document_chunks`）
@@ -32,9 +32,9 @@ HiAgent OpenAPI 通过单个 `CallKnowledgeEngineTool` action 暴露知识引擎
 | `read_wiki_source_chunk` | `CallKnowledgeEngineTool` | `wiki_read_source_chunk` | `WikiReadSourceChunk` | 按页面 slug 读取 Wiki 引用的切片 |
 | `read_wiki_source_doc` | `CallKnowledgeEngineTool` | `list_knowledge_chunks` | `ListKnowledgeChunks` | 按 resource_id 顺序读取某引用源文档的切片 |
 
-> 说明：HiAgent 中 dataset 即知识库，故 `list_datasets_with_shared` / `get_dataset` 是「列/查知识库」能力。检索工具还接受可选的 `user_info`（`{"UserID": ..., "UserChannel": ...}`），原样透传为 OpenAPI 的 `UserInfo` 终端用户身份。仅当 `UserChannel="IAM"`（或可映射到 IAM 用户的 `"Lark"`）且 `UserID` 为租户内真实用户时，后端才据此做知识库/文档级权限过滤；其它渠道按游客处理。透传它可让检索遵循终端用户自身的访问权限。
+> 说明：HiAgent 中 dataset 即知识库，故 `list_datasets` / `get_dataset` 是「列/查知识库」能力。逐子工具的参数、验证与返回结构清单见 [docs/knowledge-engine-subtools.md](../../docs/knowledge-engine-subtools.md)。
 
-> 校验模型：本 Server 是薄适配层，只校验「必须发送的字段是否存在」（workspace/dataset ID、能力要求的 pattern/slug/queries 等）并依赖工具 schema 的参数类型；数值范围、枚举、跨字段规则（如 `limit`/`overlap` 的上下限、`grep_type` 的范围约束）由后端服务负责且随版本变化，因此其 `InvalidParameter.*` 报错会原样透传给调用方，不在本层重复校验。
+> 校验模型：本 Server 是薄适配层，只校验「必须发送的字段是否存在」（workspace/dataset ID、能力要求的 pattern/slug/queries 等）并依赖工具 schema 的参数类型；数值范围、枚举、跨字段规则（如 `limit`/`overlap` 的上下限、`grep_type` 的范围约束）由后端服务负责且随版本变化，因此其 `InvalidParameter.*` 报错会原样透传给调用方，不在本层重复校验。检索工具还接受可选的 `user_info`（`{"UserID": ..., "UserChannel": ...}`），原样透传为 OpenAPI 的 `UserInfo` 终端用户身份。仅当 `UserChannel="IAM"`（或可映射到 IAM 用户的 `"Lark"`）且 `UserID` 为租户内真实用户时，后端才据此做知识库/文档级权限过滤；其它渠道按游客处理。透传它可让检索遵循终端用户自身的访问权限。
 
 ## 使用指南
 
@@ -118,7 +118,7 @@ Trae | Cursor | Claude Desktop | Cline | HiAgent MCP 插件 | ...
 HiAgent Knowledge MCP Server 提供以下功能：
 
 - `health_check`: 返回 MCP server 与 OpenAPI 的配置状态
-- `list_datasets_with_shared`: 列出当前 workspace 中可访问的自有及共享知识库
+- `list_datasets`: 发现调用身份可访问的知识库（自有库与可见共享库）
 - `get_dataset`: 获取单个知识库的详细信息
 - `search_knowledge`: 在一个或多个知识库中按相关性检索知识片段
 - `grep_knowledge_chunks`: 按 RE2 正则匹配知识切片
@@ -135,34 +135,38 @@ HiAgent Knowledge MCP Server 提供以下功能：
 health_check()
 ```
 
-#### list_datasets_with_shared
+#### list_datasets
 
-发现当前 Workspace 中 IAM 用户可访问的自有及共享知识库，通过
-`CallKnowledgeEngineTool` 的 `list_datasets_with_shared` 子工具调用。
+发现调用身份可访问的知识库（自有库与可见共享库），通过
+`CallKnowledgeEngineTool` 的 `list_datasets` 子工具调用（HiAgent v3.3.0 起统一发现）。
 
 ```python
-list_datasets_with_shared(
-    workspace_id="workspace_id",
+list_datasets(
+    workspace_id="workspace_id",   # 可选：不传则自动发现
     user_id="iam_user_id",
     keyword="财报",
     limit=20,
 )
 ```
 
-- `workspace_id`：必填，当前 Workspace。
+- `workspace_id`：可选。传则查该空间的自有及可见共享库；不传或传空白时，按调用身份
+  合并其加入的 HiAgent 空间及旧个人空间可见的全部知识库，同一 `DatasetID` 只返回一次。
 - `user_id`：可选 IAM 用户 ID，身份渠道固定为 IAM；不传则由服务端解析凭证对应用户。
-- `keyword`：可选名称/描述关键词，对应 `ListDatasetsWithShared.Filter.Keyword`。
+- `keyword`：可选名称/描述关键词，对应 `ListDatasets.Filter.Keyword`。
 - `limit`：可选，每页 1..100 条；不传时服务端默认 100。
-- `cursor`：可选，上一页的 `NextCursor`。翻页时保持用户、Workspace、关键词及 limit 不变。
+- `cursor`：可选，上一页的 `NextCursor`。翻页时保持用户、Workspace、关键词及 limit 不变；
+  不能复用其它工具或其它参数组合下的游标。
 - `ids`：可选 ID 列表；`[]` 表示空结果，与显式 `limit`/`cursor` 互斥。
 
-返回完整 OpenAPI 响应，结果位于 `Result.ListDatasetsWithShared`：`Items` 含
-`DatasetID`、`WorkspaceID`、`IndexTypes` 等摘要字段，`NextCursor` 仅在有下一页时返回，
-不包含 `Total`。权限和参数值域由服务端校验。
+返回完整 OpenAPI 响应，结果位于 `Result.ListDatasets`：`Items` 含 `DatasetID`、
+`Name`、`Description`、`WorkspaceID`、`Icon`、`IndexingTechnique`、`IndexTypes`，
+`NextCursor` 仅在有下一页时返回，不包含 `Total`。共享库的 `WorkspaceID` 为源空间。
+权限和参数值域由服务端校验；发现范围不替代检索时的权限校验。
 
-迁移：旧 `list_datasets` 已移除；工具过滤配置改用新名称，`name` 改为 `keyword`，
-页码参数改为 `limit`/`cursor`，结果读取改用上述路径。刷新客户端工具列表。
-目标 HiAgent 服务须支持此知识引擎子工具；不自动回退至旧 `ListDatasets` Action。
+迁移：本工具面向 HiAgent v3.3.0 及以上。v3.3.0 已把共享库发现并入 `list_datasets`
+并删除 `list_datasets_with_shared` 子工具（再调用会返回参数错误），因此没有回退路径。
+工具过滤配置继续使用 `list_datasets`；`name`/`page_number`/`page_size` 分别改为
+`keyword`/`limit`/`cursor`。升级后刷新客户端工具列表。
 
 #### get_dataset
 
@@ -312,7 +316,7 @@ Parameters:
 
 #### read_wiki_source_doc
 
-按 resource_id 顺序读取某个被引用源文档的切片。与 `read_wiki_source_chunk` 互补：后者按页面 slug 读引用切片；本工具顺序遍历单个被引用源文档（`resource_id`，如取自 Wiki 页面的 `SourceRefs`）。
+按 resource_id 顺序读取某个被引用源文档的切片。与 `read_wiki_source_chunk` 互补：后者按页面 slug 读引用切片；本工具顺序遍历单个引用源文档（`resource_id`，如取自 Wiki 页面的 `SourceRefs`）。
 
 ```python
 read_wiki_source_doc(
