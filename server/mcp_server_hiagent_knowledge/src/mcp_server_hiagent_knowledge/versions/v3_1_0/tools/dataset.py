@@ -17,27 +17,28 @@ from mcp_server_hiagent_knowledge.versions.v3_1_0.tools._common import (
 
 # Tool names registered by ``register_dataset_tools`` (single source of truth for
 # tool-scope filtering).
-DATASET_TOOL_NAMES = ("list_datasets_with_shared", "get_dataset")
+DATASET_TOOL_NAMES = ("list_datasets", "get_dataset")
 
 
-def list_datasets_with_shared(
+def list_datasets(
     client: OpenAPIClient,
     *,
-    workspace_id: str,
+    workspace_id: str | None = None,
     user_id: str | None = None,
     keyword: str | None = None,
     limit: int | None = None,
     cursor: str | None = None,
     ids: list[str] | None = None,
 ) -> dict[str, object]:
-    """列出当前 Workspace 中 IAM 用户可访问的自有及共享知识库。
+    """发现调用身份可访问的知识库（自有库 + 可见共享库）。
 
-    可选值原样交给服务端校验；None 表示不发送，空 IDs 保持为空数组。
-    未指定 user_id 时，由服务端解析凭证对应的 IAM 用户。
+    传 ``workspace_id`` 时查该空间的自有及可见共享库；不传或只传空白时，
+    按调用身份合并其加入的 HiAgent 空间及旧个人空间，并包含这些空间可见的
+    共享库，同一 ``DatasetID`` 只返回一次。
+
+    可选值原样交给服务端校验；None 表示不发送，空 ``ids`` 保持为空数组。
+    未指定 ``user_id`` 时，由服务端解析凭证对应的 IAM 用户。
     """
-    if not workspace_id:
-        raise ValueError("workspace_id is required")
-
     arguments: dict[str, object] = {}
     if keyword is not None:
         arguments["Filter"] = {"Keyword": keyword}
@@ -49,10 +50,12 @@ def list_datasets_with_shared(
         arguments["IDs"] = ids
 
     body: dict[str, object] = {
-        "WorkspaceID": workspace_id,
-        "ToolName": "list_datasets_with_shared",
-        "ListDatasetsWithShared": arguments,
+        "ToolName": "list_datasets",
+        "ListDatasets": arguments,
     }
+    # 空白与不传等价：服务端只在 WorkspaceID 非空时按指定空间查询。
+    if workspace_id is not None and workspace_id.strip():
+        body["WorkspaceID"] = workspace_id
     if user_id is not None:
         if not user_id.strip():
             raise ValueError("user_id must be non-empty when provided")
@@ -88,31 +91,36 @@ def get_dataset(
 def register_dataset_tools(mcp: FastMCP, client: OpenAPIClient) -> None:
     """Register dataset tools on a FastMCP server."""
 
-    @mcp.tool(name="list_datasets_with_shared")
-    def list_datasets_with_shared_tool(
-        workspace_id: str,
+    @mcp.tool(name="list_datasets")
+    def list_datasets_tool(
+        workspace_id: str | None = None,
         user_id: str | None = None,
         keyword: str | None = None,
         limit: int | None = None,
         cursor: str | None = None,
         ids: list[str] | None = None,
     ) -> dict[str, object]:
-        """发现当前 Workspace 中 IAM 用户可访问的自有及共享知识库。
+        """发现调用身份可访问的知识库（自有库与可见共享库），用于取得后续检索
+        所需的 ``dataset_ids``。
 
-        返回 Result.ListDatasetsWithShared.Items（含 DatasetID、WorkspaceID、
-        IndexTypes）及可选 NextCursor；不返回 Total。后续检索使用返回的 DatasetID。
+        返回 Result.ListDatasets.Items（含 DatasetID、Name、Description、
+        WorkspaceID、Icon、IndexingTechnique、IndexTypes）及可选 NextCursor；
+        不返回 Total。共享库的 WorkspaceID 为源空间。
 
         参数：
-        - workspace_id：当前 Workspace，必填。
+        - workspace_id：可选。传则查该空间的自有及可见共享库；不传或留空时，
+          按调用身份自动发现其加入空间及个人空间可见的全部知识库。
         - user_id：可选 IAM 用户 ID；身份渠道固定为 IAM。不传则由服务端解析凭证身份。
         - keyword：可选名称/描述关键词。
         - limit：每页数量，服务端默认 100，范围 1..100。
-        - cursor：上一页的 NextCursor；续页保持用户、Workspace、关键词和 limit 不变。
-        - ids：可选知识库 ID 列表；空数组返回空，不能与 limit/cursor 同传。
+        - cursor：上一页的 NextCursor；续页保持用户、WorkspaceID、关键词和 limit
+          不变，不能复用其它工具或其它参数组合下的游标。
+        - ids：可选知识库 ID 列表；空数组返回空，与显式 limit/cursor 互斥。
 
-        需要服务端支持知识引擎子工具 list_datasets_with_shared。
+        需要服务端为 HiAgent v3.3.0 及以上（该版本已把共享库发现并入
+        list_datasets，list_datasets_with_shared 子工具已删除）。
         """
-        return list_datasets_with_shared(
+        return list_datasets(
             client,
             workspace_id=workspace_id,
             user_id=user_id,

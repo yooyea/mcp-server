@@ -78,7 +78,7 @@ def create_mcp_server(
             "HiAgent Knowledge MCP Server exposes a knowledge base (knowledge "
             "engine) as MCP tools. Each tool is named after the user-facing "
             "capability it provides. It offers knowledge base discovery "
-            "(list_datasets_with_shared, get_dataset) and the full "
+            "(list_datasets, get_dataset) and the full "
             "knowledge-engine tool set (search_knowledge, grep_knowledge_chunks, "
             "list_document_infos, list_document_chunks, search_wiki, "
             "read_wiki_page, read_wiki_source_chunk, read_wiki_source_doc). "
@@ -93,8 +93,8 @@ def create_mcp_server(
     @mcp.tool()
     def health_check() -> dict[str, object]:
         """
-        检查 HiAgent Knowledge MCP Server 是否运行、以及必需的知识库 OpenAPI 配置是否齐备。
-        仅返回状态与各项是否已配置的布尔值，不回显任何凭证明文。
+        Check whether the HiAgent Knowledge MCP server is running and whether
+        the required knowledge base OpenAPI configuration is present.
         """
 
         return {
