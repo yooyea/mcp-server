@@ -10,7 +10,7 @@ HiAgent Knowledge MCP Server 是一个模型上下文协议（Model Context Prot
 
 ## 功能
 
-- 发现调用身份可访问的知识库（自有库与可见共享库），并查看单个知识库详情
+- 列出指定 workspace 下的知识库列表，并查看单个知识库详情
 - 在一个或多个知识库中按相关性检索知识片段（`search_knowledge`）
 - 按 RE2 正则匹配切片（`grep_knowledge_chunks`）
 - 批量读取文档元数据（`list_document_infos`）与按顺序读取文档切片（`list_document_chunks`）
