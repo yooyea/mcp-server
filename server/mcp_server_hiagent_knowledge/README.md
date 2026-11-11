@@ -4,7 +4,7 @@ This MCP server exposes a **knowledge base (knowledge engine)** as MCP tools. Ea
 
 ## Features
 
-- List knowledge bases (datasets) in a workspace, and inspect a single dataset
+- Discover knowledge bases (datasets) the calling identity can access — own and visible shared — and inspect a single dataset
 - Search knowledge across datasets by relevance (`search_knowledge`)
 - Match chunks by RE2 regex (`grep_knowledge_chunks`)
 - Read documents' metadata in batch (`list_document_infos`) and a document's chunks in order (`list_document_chunks`)
@@ -26,9 +26,9 @@ The HiAgent OpenAPI exposes the knowledge engine through a single `CallKnowledge
 | `read_wiki_source_chunk` | `CallKnowledgeEngineTool` | `wiki_read_source_chunk` | `WikiReadSourceChunk` | Read a Wiki page's referenced source chunks, by page slug |
 | `read_wiki_source_doc` | `CallKnowledgeEngineTool` | `list_knowledge_chunks` | `ListKnowledgeChunks` | Read one referenced source document's chunks in order, by resource id |
 
-> Note: in HiAgent a *dataset* is a *knowledge base*, so `list_datasets_with_shared` / `get_dataset` are the "list/inspect knowledge base" capabilities. The retrieval tools also accept an optional `user_info` (`{"UserID": ..., "UserChannel": ...}`) forwarded verbatim as the OpenAPI `UserInfo` end-user identity. The backend applies knowledge-base / document-level permission filtering to it only when `UserChannel` is `"IAM"` (or a `"Lark"` identity it can map to an IAM user) and `UserID` is a real user in the tenant; other channels are treated as guest. Pass it to make retrieval honor an end user's own access rights.
+> Note: in HiAgent a *dataset* is a *knowledge base*, so `list_datasets` / `get_dataset` are the "list/inspect knowledge base" capabilities. A per-sub-tool parameter, verification and return-shape matrix is maintained in [docs/knowledge-engine-subtools.md](../../docs/knowledge-engine-subtools.md).
 
-> Validation model: this server is a thin adapter. It only checks that the fields it must always send are present (workspace/dataset ids, a pattern/slug/queries where the capability requires one) and relies on argument types from the tool schema. Value ranges, enums and cross-field rules (e.g. `limit`/`overlap` bounds, `grep_type` scope rules) are owned by the backend service and are version-specific, so its `InvalidParameter.*` errors are passed through to the caller rather than duplicated here.
+> Validation model: this server is a thin adapter. It only checks that the fields it must always send are present (workspace/dataset ids, a pattern/slug/queries where the capability requires one) and relies on argument types from the tool schema. Value ranges, enums and cross-field rules (e.g. `limit`/`overlap` bounds, `grep_type` scope rules) are owned by the backend service and are version-specific, so its `InvalidParameter.*` errors are passed through to the caller rather than duplicated here. The retrieval tools also accept an optional `user_info` (`{"UserID": ..., "UserChannel": ...}`) forwarded verbatim as the OpenAPI `UserInfo` end-user identity. The backend applies knowledge-base / document-level permission filtering to it only when `UserChannel` is `"IAM"` (or a `"Lark"` identity it can map to an IAM user) and `UserID` is a real user in the tenant; other channels are treated as guest. Pass it to make retrieval honor an end user's own access rights.
 
 ## Setup
 
@@ -130,37 +130,47 @@ Report the MCP server and OpenAPI configuration state.
 health_check()
 ```
 
-#### list_datasets_with_shared
+#### list_datasets
 
-Discover accessible owned and shared knowledge bases in the current workspace via
-`CallKnowledgeEngineTool` / `list_datasets_with_shared`.
+Discover the knowledge bases the calling identity can access, including own
+datasets and visible shared ones, via `CallKnowledgeEngineTool` /
+`list_datasets` (unified discovery since HiAgent v3.3.0).
 
 ```python
-list_datasets_with_shared(
-    workspace_id="workspace_id",
+list_datasets(
+    workspace_id="workspace_id",   # optional: omit to auto-discover
     user_id="iam_user_id",
     keyword="finance",
     limit=20,
 )
 ```
 
-- `workspace_id` (required): current workspace.
+- `workspace_id` (optional): scope discovery to one workspace (its own plus
+  visible shared datasets). Omit it — or pass a blank value — to merge every
+  HiAgent workspace the identity has joined plus its legacy personal space; each
+  `DatasetID` appears once.
 - `user_id` (optional): IAM user ID; the channel is fixed to IAM. When omitted,
   the backend resolves the IAM identity associated with the credentials.
-- `keyword` (optional): name/description keyword, sent as `ListDatasetsWithShared.Filter.Keyword`.
+- `keyword` (optional): name/description keyword, sent as `ListDatasets.Filter.Keyword`.
 - `limit` (optional): page size, 1..100; the backend defaults to 100 when omitted.
-- `cursor` (optional): previous `NextCursor`. Keep the same user, workspace, keyword and limit across pages.
-- `ids` (optional): dataset IDs; `[]` returns no items. Mutually exclusive with explicit `limit`/`cursor`.
+- `cursor` (optional): previous `NextCursor`. Keep the same user, workspace, keyword
+  and limit across pages; cursors are not interchangeable with other tools or
+  parameter sets.
+- `ids` (optional): dataset IDs; `[]` returns no items. Mutually exclusive with
+  explicit `limit`/`cursor`.
 
-The full OpenAPI response is preserved. `Result.ListDatasetsWithShared` contains
-`Items` (including `DatasetID`, `WorkspaceID`, `IndexTypes`) and an optional
-`NextCursor`, with no `Total`. The backend enforces permissions and argument constraints.
+The full OpenAPI response is preserved. `Result.ListDatasets` contains `Items`
+(`DatasetID`, `Name`, `Description`, `WorkspaceID`, `Icon`, `IndexingTechnique`,
+`IndexTypes`) and an optional `NextCursor`, with no `Total`. For a shared dataset,
+`WorkspaceID` is the source workspace. The backend enforces permissions and
+argument constraints; shared visibility never replaces the retrieval-time
+permission check.
 
-Migration: the old `list_datasets` tool is removed. Update tool filters to the new
-name, replace `name` with `keyword` and page-number arguments with `limit`/`cursor`,
-and read the result at the path above. Refresh the client's tool list. The target
-HiAgent backend must support this knowledge-engine sub-tool; there is no automatic
-fallback to the old `ListDatasets` action.
+Migration: this targets HiAgent v3.3.0 and later. v3.3.0 merged shared discovery
+into `list_datasets` and deleted the `list_datasets_with_shared` sub-tool (calling
+it now fails with a parameter error), so there is no fallback path. Tool filters
+keep using `list_datasets`; `name`/`page_number`/`page_size` are replaced by
+`keyword`/`limit`/`cursor`. Refresh the client's tool list after upgrading.
 
 #### get_dataset
 
